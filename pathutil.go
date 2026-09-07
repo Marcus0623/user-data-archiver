@@ -89,6 +89,10 @@ func isBaseOf(base, target string) bool {
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
+func samePath(a, b string) bool {
+	return strings.EqualFold(normalizeAbs(a), normalizeAbs(b))
+}
+
 func stripWindowsOldPrefix(parts []string) []string {
 	if len(parts) >= 2 && strings.EqualFold(parts[0], "Windows.old") {
 		return parts[1:]

@@ -10,218 +10,143 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 )
 
 func main() {
 	setupConsole()
 
-	dstFlag := flag.String("dst", "", "归档目标目录（最终目录，里面会生成 C、D 等盘符文件夹）")
-	nameFlag := flag.String("name", "", "员工姓名；交互模式下会拼到目标父目录后面")
-	srcFlag := flag.String("src", "", "源路径，逗号分隔。例如 C: 或 C:,D: 或 C:\\Users")
-	modeFlag := flag.String("mode", "", "归档模式: personal | appdata | all。默认 appdata")
-	includePF := flag.Bool("include-program-files", false, "包含 Program Files / ProgramData（体积很大，离职交接通常不需要）")
-	includeRegen := flag.Bool("include-regeneratable", false, "包含 node_modules、__pycache__ 等可再生成目录")
-	excludeFlag := flag.String("exclude", "", "额外排除的目录名（任意层级匹配），逗号分隔")
-	dryRun := flag.Bool("dry-run", false, "只扫描预览，不复制")
-	yes := flag.Bool("yes", false, "扫描后不询问，直接开始复制")
+	dstFlag := flag.String("dst", "", "archive destination folder (drive letters become C, D, ... subfolders)")
+	nameFlag := flag.String("name", "", "person name; in interactive mode this is appended to the parent folder")
+	srcFlag := flag.String("src", "", "source paths, comma-separated. Example: C: or C:,D: or C:\\Users")
+	modeFlag := flag.String("mode", "", "archive mode: personal | appdata | all. Default appdata")
+	includePF := flag.Bool("include-program-files", false, "include Program Files / ProgramData (large; usually not needed)")
+	includeRegen := flag.Bool("include-regeneratable", false, "include node_modules, __pycache__, and similar folders")
+	excludeFlag := flag.String("exclude", "", "extra directory names to skip at any depth, comma-separated")
+	dryRun := flag.Bool("dry-run", false, "scan and preview only, do not copy")
+	yes := flag.Bool("yes", false, "do not ask for confirmation after the scan")
+	cliFlag := flag.Bool("cli", false, "use the command-line interface instead of the window")
+	cutFlag := flag.Bool("cut", false, "move files: delete originals only after the destination is flushed and contents match")
 	flag.Parse()
 
+	if !*cliFlag && !*yes {
+		if consoleProcessCount() <= 1 {
+			hideConsoleWindow()
+		}
+		runGUI(guiPrefill{
+			Name:                strings.TrimSpace(*nameFlag),
+			Dest:                strings.TrimSpace(*dstFlag),
+			Src:                 strings.TrimSpace(*srcFlag),
+			Mode:                strings.TrimSpace(*modeFlag),
+			IncludeProgramFiles: *includePF,
+			IncludeRegen:        *includeRegen,
+			Exclude:             strings.TrimSpace(*excludeFlag),
+			DryRun:              *dryRun,
+			Cut:                 *cutFlag,
+		})
+		return
+	}
+
+	runCLI(*dstFlag, *nameFlag, *srcFlag, *modeFlag, *includePF, *includeRegen, *excludeFlag, *dryRun, *yes, *cutFlag)
+}
+
+func runCLI(dstFlag, nameFlag, srcFlag, modeFlag string, includePF, includeRegen bool, excludeFlag string, dryRun, yes, cut bool) {
 	in := bufio.NewReader(os.Stdin)
 
 	fmt.Println("========================================")
-	fmt.Println("  离职资料归档工具")
+	fmt.Println("  User Data Archiver")
 	fmt.Println("========================================")
-	fmt.Printf("计算机: %s\n", computerName())
+	fmt.Printf("Computer: %s\n", computerName())
 	if isAdmin() {
-		fmt.Println("权限: 已是管理员（可读取其他用户目录）")
+		fmt.Println("Rights: running as administrator (can read other user profiles)")
 	} else {
-		fmt.Println("权限: 当前不是管理员。若要归档本机全部用户资料，请右键“以管理员身份运行”。")
+		fmt.Println("Rights: not administrator. Right-click and Run as administrator to archive all local user profiles.")
 	}
 	fmt.Println()
 
-	employee := strings.TrimSpace(*nameFlag)
+	employee := strings.TrimSpace(nameFlag)
 	if employee == "" {
-		if *yes {
+		if yes {
 			employee = defaultName()
 		} else {
-			employee = prompt(in, "员工姓名（用于文件夹命名）", defaultName())
+			employee = prompt(in, "Person name (used in the folder name)", defaultName())
 		}
 	}
 	employee = sanitizeEmployeeName(employee)
 
-	dest := strings.TrimSpace(*dstFlag)
+	dest := strings.TrimSpace(dstFlag)
 	if dest == "" {
-		if *yes {
-			fatal("使用 -yes 时必须指定 -dst")
+		if yes {
+			fatal("-yes requires -dst")
 		}
-		parent := prompt(in, "目标父目录（例如 D:\\离职归档）", `D:\离职归档`)
+		parent := prompt(in, "Destination parent folder (example D:\\offboarding-archive)", defaultDestParent)
 		dest = filepath.Join(strings.TrimSpace(parent), employee)
 	}
 	dest = normalizeAbs(dest)
-	if vol := filepath.VolumeName(dest); vol != "" {
-		if _, err := os.Stat(vol + `\`); err != nil {
-			fmt.Printf("警告: 目标盘 %s 当前无法访问，稍后创建目录可能会失败。\n", vol)
-		}
+	fmt.Printf("Destination drive: %s\n", destDriveInfo(dest))
+	fmt.Printf("Destination folder: %s\n", dest)
+	fmt.Print("Checking that the destination is writable... ")
+	if err := probeDestWritable(dest); err != nil {
+		fmt.Println("FAILED")
+		fatal(err.Error() + "\nIf you lack permission: pick a folder where you can create files; on USB drives turn off the write-protect switch and unlock BitLocker; or ask an admin for Modify rights. Running as administrator is for reading other profiles on C:, and does not replace write access to the destination.")
 	}
+	fmt.Println("OK")
 
-	srcText := strings.TrimSpace(*srcFlag)
+	srcText := strings.TrimSpace(srcFlag)
 	if srcText == "" {
-		if *yes {
-			fatal("使用 -yes 时必须指定 -src")
+		if yes {
+			fatal("-yes requires -src")
 		}
-		srcText = prompt(in, "源路径（多个用逗号，盘符如 C: ）", "C:")
+		srcText = prompt(in, "Source path (comma-separated, drive letter like C:)", "C:")
 	}
 	roots := splitRoots(srcText)
 	if len(roots) == 0 {
-		fatal("未指定源路径")
+		fatal("no source path specified")
 	}
 
 	mode := ModeWithAppData
-	if strings.TrimSpace(*modeFlag) != "" {
-		mode = ParseMode(*modeFlag)
-	} else if !*yes {
+	if strings.TrimSpace(modeFlag) != "" {
+		mode = ParseMode(modeFlag)
+	} else if !yes {
 		fmt.Println()
-		fmt.Println("归档模式:")
+		fmt.Println("Archive mode:")
 		fmt.Println("  1) " + ModePersonal.Title())
 		fmt.Println("  2) " + ModeWithAppData.Title())
 		fmt.Println("  3) " + ModeAllNonSystem.Title())
-		mode = ParseMode(prompt(in, "请选择", "2"))
+		mode = ParseMode(prompt(in, "Choose", "2"))
 	}
 
 	opt := Options{
 		Mode:                mode,
-		IncludeProgramFiles: *includePF,
-		SkipRegeneratable:   !*includeRegen,
+		IncludeProgramFiles: includePF,
+		SkipRegeneratable:   !includeRegen,
 		DestAbs:             dest,
 		EmployeeName:        employee,
-		ExtraExclude:        splitRoots(*excludeFlag),
+		ExtraExclude:        splitRoots(excludeFlag),
+		Cut:                 cut,
 	}
 
 	fmt.Println()
-	fmt.Println("将按原目录结构归档，盘符冒号会改成文件夹名（Windows 不允许 D:\\C:\\...）:")
-	fmt.Printf("  C:\\Users\\%s\\Downloads\\文件.pdf\n", employee)
-	fmt.Printf("    -> %s\n", filepath.Join(dest, "C", "Users", employee, "Downloads", "文件.pdf"))
-	fmt.Printf("模式: %s\n", opt.Mode.Title())
-	fmt.Printf("源: %s\n", joinComma(roots))
-	fmt.Printf("目标: %s\n", dest)
-	fmt.Println("说明: 将跳过 Windows、回收站、页面文件等重装系统后仍在的系统目录；默认不拷贝 Program Files。")
-	fmt.Println("建议: 若使用 OneDrive“仅联机”文件，请先设为“始终保留在此设备上”。")
-	fmt.Println()
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-
-	fmt.Println("正在扫描（可能需要几分钟）...")
-	started := time.Now()
-	var scanErrs int
-	sum, err := Scan(ctx, roots, opt, func(src string, e error) {
-		scanErrs++
-		if scanErrs <= 20 {
-			fmt.Printf("  [扫描跳过] %s: %v\n", src, e)
-		}
-	})
-	if err != nil {
-		if ctx.Err() != nil {
-			fatal("已中断")
-		}
-		fatal("扫描失败: " + err.Error())
-	}
-
-	fmt.Println()
-	fmt.Println("预览（按顶层目录）:")
-	for _, folder := range sum.sortedFolders() {
-		if folder.Files == 0 && folder.Bytes == 0 {
-			continue
-		}
-		fmt.Printf("  %-28s %8d 文件  %10s\n", folder.Key, folder.Files, formatBytes(folder.Bytes))
-	}
-	fmt.Printf("\n合计: %d 个文件, %s", sum.Files, formatBytes(sum.Bytes))
-	if sum.Errors > 0 {
-		fmt.Printf("（扫描中 %d 个路径无法读取）", sum.Errors)
-	}
-	fmt.Println()
-
-	if vol := filepath.VolumeName(dest); vol != "" {
-		if free, _, err := diskFreeBytes(vol + `\`); err == nil {
-			fmt.Printf("目标盘剩余空间: %s\n", formatBytes(int64(free)))
-			need := uint64(sum.Bytes) + uint64(sum.Bytes/20) + 64*1024*1024
-			if free < need {
-				fmt.Println("警告: 剩余空间可能不足。")
-				if !*yes && !askYes(in, "空间可能不够，仍要继续", false) {
-					fmt.Println("已取消。")
-					return
-				}
+	err := runArchiveJob(ctx, roots, dest, employee, opt, dryRun, yes, jobUI{
+		log: func(format string, args ...any) {
+			fmt.Printf(format+"\n", args...)
+		},
+		progress: func(doneFiles, totalFiles, doneBytes, totalBytes int64, src string) {
+			pct := ""
+			if totalBytes > 0 {
+				pct = fmt.Sprintf(" %.1f%%", float64(doneBytes)*100/float64(totalBytes))
 			}
-		}
-	}
-
-	if *dryRun {
-		if err := os.MkdirAll(longPath(dest), 0o755); err == nil {
-			_ = writeReport(dest, computerName(), employee, roots, opt, sum, nil, "", started)
-			fmt.Printf("已写入预览报告: %s\n", filepath.Join(dest, "_归档报告.txt"))
-		}
-		fmt.Println("dry-run 完成，未复制文件。")
-		return
-	}
-
-	if !*yes {
-		if !askYes(in, "开始复制到目标目录", true) {
-			fmt.Println("已取消。")
-			return
-		}
-	}
-
-	if err := os.MkdirAll(longPath(dest), 0o755); err != nil {
-		fatal("无法创建目标目录: " + err.Error())
-	}
-
-	fmt.Println("正在复制（可随时 Ctrl+C 中断，再次运行会跳过已相同的文件）...")
-	lastPrint := time.Now()
-	fails := make([][]string, 0, 64)
-	res, err := Archive(ctx, roots, opt, dest, func(doneFiles, doneBytes int64, src string) {
-		if time.Since(lastPrint) < 200*time.Millisecond {
-			return
-		}
-		lastPrint = time.Now()
-		pct := ""
-		if sum.Bytes > 0 {
-			pct = fmt.Sprintf(" %.1f%%", float64(doneBytes)*100/float64(sum.Bytes))
-		}
-		fmt.Printf("\r  %d/%d 文件%s  %s  %s          ",
-			doneFiles, sum.Files, pct, formatBytes(doneBytes), shortenPath(src, 60))
-	}, func(src, dst string, e error) {
-		if len(fails) < 5000 {
-			fails = append(fails, []string{src, dst, e.Error()})
-		}
+			fmt.Printf("\r  %d/%d files%s  %s  %s          ",
+				doneFiles, totalFiles, pct, formatBytes(doneBytes), shortenPath(src, 60))
+		},
+		ask: func(question string, defYes bool) bool {
+			return askYes(in, question, defYes)
+		},
 	})
 	fmt.Println()
-	if err != nil && ctx.Err() != nil {
-		fmt.Println("已中断。可使用同一目标目录再次运行以续传。")
-	} else if err != nil {
-		fmt.Println("复制过程出错:", err)
-	}
-
-	failPath := ""
-	if len(fails) > 0 {
-		failPath = filepath.Join(dest, "_失败清单.csv")
-		if werr := writeFailCSV(failPath, fails); werr != nil {
-			fmt.Println("写入失败清单出错:", werr)
-			failPath = ""
-		}
-	}
-	if werr := writeReport(dest, computerName(), employee, roots, opt, sum, res, failPath, started); werr != nil {
-		fmt.Println("写入报告出错:", werr)
-	}
-
-	if res != nil {
-		fmt.Printf("完成: 新复制 %d 个文件 (%s)，续传跳过 %d，失败 %d\n",
-			res.CopiedFiles, formatBytes(res.CopiedBytes), res.SkippedSame, res.Failed)
-	}
-	fmt.Printf("目标目录: %s\n", dest)
-	fmt.Printf("报告: %s\n", filepath.Join(dest, "_归档报告.txt"))
-	if failPath != "" {
-		fmt.Printf("失败清单: %s\n", failPath)
+	if err != nil {
+		fatal(err.Error())
 	}
 }
 
@@ -285,7 +210,7 @@ func askYes(in *bufio.Reader, label string, defYes bool) bool {
 	if text == "" {
 		return defYes
 	}
-	return text == "y" || text == "yes" || text == "是"
+	return text == "y" || text == "yes"
 }
 
 func fatal(msg string) {

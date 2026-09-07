@@ -145,7 +145,7 @@ func underAppData(parts []string) bool {
 func skipReason(absPath string, isDir bool, opt Options) (skip bool, skipWhole bool, reason string) {
 	absPath = normalizeAbs(absPath)
 	if opt.DestAbs != "" && isBaseOf(opt.DestAbs, absPath) {
-		return true, isDir, "归档目标目录"
+		return true, isDir, "archive destination"
 	}
 
 	_, rel := volumeAndRel(absPath)
@@ -156,11 +156,11 @@ func skipReason(absPath string, isDir bool, opt Options) (skip bool, skipWhole b
 
 	for _, p := range parts {
 		if hasName(skipAnywhereDirNames, p) {
-			return true, isDir, "系统卷/回收站"
+			return true, isDir, "recycle bin / system volume"
 		}
 		for _, ex := range opt.ExtraExclude {
 			if strings.EqualFold(p, strings.TrimSpace(ex)) && strings.TrimSpace(ex) != "" {
-				return true, isDir, "自定义排除"
+				return true, isDir, "custom exclude"
 			}
 		}
 	}
@@ -176,39 +176,39 @@ func skipReason(absPath string, isDir bool, opt Options) (skip bool, skipWhole b
 			if opt.IncludeProgramFiles {
 				return false, false, ""
 			}
-			return true, isDir, "已安装程序/ProgramData"
+			return true, isDir, "installed programs / ProgramData"
 		}
 		if hasName(oemRootDirNames, rootName) && opt.Mode == ModeAllNonSystem && opt.IncludeProgramFiles {
 			return false, false, ""
 		}
-		return true, isDir, "系统/OEM 初始目录"
+		return true, isDir, "system/OEM directory"
 	}
 
 	if !isDir && len(logical) == 1 && hasName(systemRootFileNames, logical[0]) {
-		return true, false, "系统页面/休眠文件"
+		return true, false, "paging/hiber file"
 	}
 
 	if len(logical) >= 2 && strings.EqualFold(logical[0], "Users") {
 		userName := logical[1]
 		if hasName(skipUserProfileNames, userName) {
-			return true, isDir, "系统默认用户配置"
+			return true, isDir, "default user profile"
 		}
 		if len(logical) >= 3 {
 			leaf := logical[len(logical)-1]
 			if !isDir && isHiveFile(leaf) && len(logical) == 3 {
-				return true, false, "用户注册表配置单元"
+				return true, false, "user registry hive"
 			}
 			if opt.Mode == ModePersonal && underAppData(logical[2:]) {
-				return true, isDir, "AppData（个人资料模式已排除）"
+				return true, isDir, "AppData (excluded in personal mode)"
 			}
 			if opt.Mode != ModePersonal && underAppData(logical[2:]) && isDir && hasName(cacheDirNames, leaf) {
-				return true, true, "软件缓存目录"
+				return true, true, "app cache"
 			}
 		}
 	}
 
 	if opt.SkipRegeneratable && isDir && hasName(regeneratableDirNames, logical[len(logical)-1]) {
-		return true, true, "可再生成目录"
+		return true, true, "regeneratable directory"
 	}
 
 	return false, false, ""

@@ -1,0 +1,14 @@
+---
+description: Replace stale Windows executables after every project update
+alwaysApply: true
+---
+
+# Keep a single fresh executable
+
+After any code or resource change in this repo:
+
+1. Delete leftover binaries in the project root (`*.exe`, `*.exe.new`).
+2. Rebuild only `user-data-archiver.exe` with `build.bat`.
+3. Confirm the folder contains that one exe and no older copies.
+
+Do not leave extra or stale executables for the user to run by mistake.

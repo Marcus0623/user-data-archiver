@@ -1,15 +1,21 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"syscall"
 	"time"
 	"unicode/utf8"
 )
+
+var errOnlinePlaceholder = errors.New("not deleting online-only/cloud placeholder")
 
 type CopyResult struct {
 	CopiedFiles int64
@@ -17,6 +23,8 @@ type CopyResult struct {
 	SkippedSame int64
 	Failed      int64
 	Dirs        int64
+	CutFiles    int64
+	CutFailed   int64
 }
 
 func sameFile(srcInfo os.FileInfo, dst string) bool {
@@ -67,21 +75,49 @@ func copyFileOnce(src, dst string, srcInfo os.FileInfo) error {
 		}
 	}()
 
-	if _, err := io.Copy(out, in); err != nil {
+	live, err := in.Stat()
+	if err != nil {
+		return err
+	}
+	want := live.Size()
+	n, err := io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	if n != want {
+		return fmt.Errorf("copied %d bytes, source size is %d", n, want)
+	}
+	if err := out.Sync(); err != nil {
 		return err
 	}
 	if err := out.Close(); err != nil {
 		return err
 	}
+	st, err := os.Stat(longPath(tmp))
+	if err != nil {
+		return err
+	}
+	if st.Size() != want {
+		return fmt.Errorf("temp file size %d does not match source %d", st.Size(), want)
+	}
 	_ = os.Chtimes(longPath(tmp), srcInfo.ModTime(), srcInfo.ModTime())
-	_ = os.Remove(longPath(dst))
-	if err := os.Rename(longPath(tmp), longPath(dst)); err != nil {
-		if copyErr := replaceByCopy(tmp, dst); copyErr != nil {
-			return err
-		}
+	if err := replaceFile(tmp, dst); err != nil {
+		return err
 	}
 	ok = true
+	if err := verifyDestComplete(dst, want); err != nil {
+		return err
+	}
+	_ = os.Chtimes(longPath(dst), srcInfo.ModTime(), srcInfo.ModTime())
 	return nil
+}
+
+func replaceFile(tmp, dst string) error {
+	clearReadOnly(dst)
+	if err := moveFileReplace(tmp, dst); err == nil {
+		return nil
+	}
+	return replaceByCopy(tmp, dst)
 }
 
 func replaceByCopy(tmp, dst string) error {
@@ -90,17 +126,186 @@ func replaceByCopy(tmp, dst string) error {
 		return err
 	}
 	defer in.Close()
-	out, err := os.OpenFile(longPath(dst), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	srcInfo, err := in.Stat()
 	if err != nil {
 		return err
 	}
-	_, copyErr := io.Copy(out, in)
-	closeErr := out.Close()
-	_ = os.Remove(longPath(tmp))
-	if copyErr != nil {
-		return copyErr
+	sidecar := dst + ".replacing"
+	out, err := os.OpenFile(longPath(sidecar), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
 	}
-	return closeErr
+	n, copyErr := io.Copy(out, in)
+	syncErr := out.Sync()
+	closeErr := out.Close()
+	if copyErr != nil || syncErr != nil || closeErr != nil || n != srcInfo.Size() {
+		_ = os.Remove(longPath(sidecar))
+		if copyErr != nil {
+			return copyErr
+		}
+		if n != srcInfo.Size() {
+			return fmt.Errorf("copied %d bytes, temp size is %d", n, srcInfo.Size())
+		}
+		if syncErr != nil {
+			return syncErr
+		}
+		return closeErr
+	}
+	if err := moveFileReplace(sidecar, dst); err != nil {
+		_ = os.Remove(longPath(sidecar))
+		return err
+	}
+	_ = os.Remove(longPath(tmp))
+	return nil
+}
+
+func verifyDestComplete(dst string, wantSize int64) error {
+	st, err := os.Stat(longPath(dst))
+	if err != nil {
+		return fmt.Errorf("destination missing after save: %w", err)
+	}
+	if st.IsDir() {
+		return fmt.Errorf("destination is a directory, not a file: %s", dst)
+	}
+	if st.Size() != wantSize {
+		return fmt.Errorf("destination size %d does not match source %d", st.Size(), wantSize)
+	}
+	f, err := os.Open(longPath(dst))
+	if err != nil {
+		return fmt.Errorf("destination not readable after save: %w", err)
+	}
+	_ = f.Close()
+	return nil
+}
+
+func contentsEqual(src, dst string) (bool, error) {
+	fa, err := os.Open(longPath(src))
+	if err != nil {
+		return false, err
+	}
+	defer fa.Close()
+	fb, err := os.Open(longPath(dst))
+	if err != nil {
+		return false, err
+	}
+	defer fb.Close()
+	sa, err := fa.Stat()
+	if err != nil {
+		return false, err
+	}
+	sb, err := fb.Stat()
+	if err != nil {
+		return false, err
+	}
+	if sa.Size() != sb.Size() {
+		return false, nil
+	}
+	bufa := make([]byte, 256*1024)
+	bufb := make([]byte, 256*1024)
+	for {
+		na, ea := fa.Read(bufa)
+		nb, eb := fb.Read(bufb)
+		if !bytes.Equal(bufa[:na], bufb[:nb]) {
+			return false, nil
+		}
+		aDone := ea == io.EOF
+		bDone := eb == io.EOF
+		if ea != nil && !aDone {
+			return false, ea
+		}
+		if eb != nil && !bDone {
+			return false, eb
+		}
+		if aDone && bDone {
+			return true, nil
+		}
+		if aDone != bDone {
+			return false, nil
+		}
+		if na == 0 && nb == 0 {
+			return false, errors.New("empty read without EOF")
+		}
+	}
+}
+
+func destReadyForCut(src, dst string, _ os.FileInfo) error {
+	if samePath(src, dst) {
+		return fmt.Errorf("source and destination are the same path")
+	}
+	st, err := os.Stat(longPath(src))
+	if err != nil {
+		return err
+	}
+	if err := verifyDestComplete(dst, st.Size()); err != nil {
+		return err
+	}
+	ok, err := contentsEqual(src, dst)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("destination content does not match source")
+	}
+	return nil
+}
+
+func clearReadOnly(path string) {
+	st, err := os.Stat(longPath(path))
+	if err != nil {
+		return
+	}
+	if st.Mode()&0200 == 0 {
+		_ = os.Chmod(longPath(path), st.Mode()|0200)
+	}
+}
+
+func isOnlinePlaceholder(info os.FileInfo) bool {
+	if info == nil {
+		return false
+	}
+	st, ok := info.Sys().(*syscall.Win32FileAttributeData)
+	if !ok {
+		return false
+	}
+	const (
+		fileAttributeRecallOnDataAccess = 0x00400000
+		fileAttributeRecallOnOpen       = 0x00040000
+	)
+	return st.FileAttributes&(fileAttributeRecallOnDataAccess|fileAttributeRecallOnOpen) != 0
+}
+
+func saveThenMaybeCut(src, dst string, info os.FileInfo, cut bool, already bool) (copied, destOK, cutOK bool, err error) {
+	if samePath(src, dst) {
+		return false, false, false, fmt.Errorf("refusing to archive a file onto itself")
+	}
+	needCopy := !already
+	if cut && already {
+		if destReadyForCut(src, dst, info) != nil {
+			needCopy = true
+		}
+	}
+	if needCopy {
+		if err := copyFileWithRetry(src, dst, info); err != nil {
+			return false, false, false, err
+		}
+		copied = true
+	}
+	if !cut {
+		return copied, true, false, nil
+	}
+	if isOnlinePlaceholder(info) {
+		ready := destReadyForCut(src, dst, info) == nil
+		return copied, ready, false, errOnlinePlaceholder
+	}
+	if err := destReadyForCut(src, dst, info); err != nil {
+		return copied, false, false, err
+	}
+	clearReadOnly(src)
+	if err := os.Remove(longPath(src)); err != nil {
+		return copied, true, false, fmt.Errorf("saved but could not delete source: %w", err)
+	}
+	removeEmptyParents(src)
+	return copied, true, true, nil
 }
 
 func Archive(ctx context.Context, roots []string, opt Options, dest string, onProgress func(doneFiles, doneBytes int64, src string), onErr func(src, dst string, err error)) (*CopyResult, error) {
@@ -130,22 +335,36 @@ func Archive(ctx context.Context, roots []string, opt Options, dest string, onPr
 			res.Dirs++
 			return nil
 		}
-		if sameFile(info, dst) {
-			res.SkippedSame++
-			if onProgress != nil {
-				onProgress(res.CopiedFiles+res.SkippedSame, res.CopiedBytes+info.Size(), src)
+		already := sameFile(info, dst)
+		copied, destOK, cutOK, err := saveThenMaybeCut(src, dst, info, opt.Cut, already)
+		if err != nil {
+			if destOK {
+				if copied {
+					res.CopiedFiles++
+					res.CopiedBytes += info.Size()
+				} else {
+					res.SkippedSame++
+				}
+				if opt.Cut {
+					res.CutFailed++
+				}
+			} else {
+				res.Failed++
 			}
-			return nil
-		}
-		if err := copyFileWithRetry(src, dst, info); err != nil {
-			res.Failed++
 			if onErr != nil {
 				onErr(src, dst, err)
 			}
 			return nil
 		}
-		res.CopiedFiles++
-		res.CopiedBytes += info.Size()
+		if copied {
+			res.CopiedFiles++
+			res.CopiedBytes += info.Size()
+		} else {
+			res.SkippedSame++
+		}
+		if opt.Cut && cutOK {
+			res.CutFiles++
+		}
 		if onProgress != nil {
 			onProgress(res.CopiedFiles+res.SkippedSame, res.CopiedBytes, src)
 		}
@@ -154,43 +373,86 @@ func Archive(ctx context.Context, roots []string, opt Options, dest string, onPr
 	return res, err
 }
 
+func removeEmptyParents(filePath string) {
+	dir := filepath.Dir(normalizeAbs(filePath))
+	root := filepath.VolumeName(dir) + `\`
+	for {
+		cleanRoot := strings.TrimSuffix(root, `\`)
+		if strings.EqualFold(dir, root) || strings.EqualFold(dir, cleanRoot) {
+			return
+		}
+		if !mayRemoveEmptiedDir(dir) {
+			return
+		}
+		if err := os.Remove(longPath(dir)); err != nil {
+			return
+		}
+		parent := filepath.Dir(dir)
+		if strings.EqualFold(parent, dir) {
+			return
+		}
+		dir = parent
+	}
+}
+
+func mayRemoveEmptiedDir(path string) bool {
+	_, rel := volumeAndRel(path)
+	parts := pathComponents(rel)
+	if len(parts) == 0 {
+		return false
+	}
+	logical := stripWindowsOldPrefix(parts)
+	if len(logical) == 0 {
+		return false
+	}
+	if strings.EqualFold(logical[0], "Users") && len(logical) <= 2 {
+		return false
+	}
+	return true
+}
+
 func writeReport(dest, computer, employee string, roots []string, opt Options, sum *Summary, res *CopyResult, failPath string, started time.Time) error {
 	if err := os.MkdirAll(longPath(dest), 0o755); err != nil {
 		return err
 	}
-	p := filepath.Join(dest, "_归档报告.txt")
+	p := filepath.Join(dest, reportFileName)
 	f, err := os.Create(longPath(p))
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	fmt.Fprintf(f, "离职资料归档报告\r\n")
-	fmt.Fprintf(f, "================\r\n")
-	fmt.Fprintf(f, "计算机名: %s\r\n", computer)
-	fmt.Fprintf(f, "员工标识: %s\r\n", employee)
-	fmt.Fprintf(f, "开始时间: %s\r\n", started.Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(f, "结束时间: %s\r\n", time.Now().Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(f, "归档模式: %s\r\n", opt.Mode.Title())
-	fmt.Fprintf(f, "包含已安装程序: %v\r\n", opt.IncludeProgramFiles)
-	fmt.Fprintf(f, "跳过可再生成目录: %v\r\n", opt.SkipRegeneratable)
-	fmt.Fprintf(f, "源路径: %s\r\n", joinComma(roots))
-	fmt.Fprintf(f, "目标目录: %s\r\n", dest)
-	fmt.Fprintf(f, "\r\n路径对照示例:\r\n")
-	fmt.Fprintf(f, "  C:\\Users\\张三\\Downloads\\a.pdf  ->  %s\\C\\Users\\张三\\Downloads\\a.pdf\r\n", dest)
-	fmt.Fprintf(f, "  （Windows 路径不能使用 D:\\C:\\... 这种带冒号的目录名，因此用 D:\\...\\C\\... 表示 C 盘）\r\n")
-	fmt.Fprintf(f, "\r\n扫描合计: %d 个文件, %s\r\n", sum.Files, formatBytes(sum.Bytes))
+	fmt.Fprintf(f, "User Data Archive Report\r\n")
+	fmt.Fprintf(f, "========================\r\n")
+	fmt.Fprintf(f, "Computer: %s\r\n", computer)
+	fmt.Fprintf(f, "Person: %s\r\n", employee)
+	fmt.Fprintf(f, "Started: %s\r\n", started.Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(f, "Finished: %s\r\n", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(f, "Mode: %s\r\n", opt.Mode.Title())
+	fmt.Fprintf(f, "Transfer: %s\r\n", transferTitle(opt.Cut))
+	fmt.Fprintf(f, "Include installed programs: %v\r\n", opt.IncludeProgramFiles)
+	fmt.Fprintf(f, "Skip regeneratable folders: %v\r\n", opt.SkipRegeneratable)
+	fmt.Fprintf(f, "Source: %s\r\n", joinComma(roots))
+	fmt.Fprintf(f, "Destination: %s\r\n", dest)
+	fmt.Fprintf(f, "\r\nPath mapping example:\r\n")
+	fmt.Fprintf(f, "  C:\\Users\\alice\\Downloads\\a.pdf  ->  %s\\C\\Users\\alice\\Downloads\\a.pdf\r\n", dest)
+	fmt.Fprintf(f, "  (Windows cannot use D:\\C:\\... as a folder name, so D:\\...\\C\\... stands for drive C:)\r\n")
+	fmt.Fprintf(f, "\r\nScan total: %d files, %s\r\n", sum.Files, formatBytes(sum.Bytes))
 	if res != nil {
-		fmt.Fprintf(f, "新复制: %d 个文件, %s\r\n", res.CopiedFiles, formatBytes(res.CopiedBytes))
-		fmt.Fprintf(f, "已存在且相同（续传跳过）: %d\r\n", res.SkippedSame)
-		fmt.Fprintf(f, "失败: %d\r\n", res.Failed)
+		fmt.Fprintf(f, "Newly copied: %d files, %s\r\n", res.CopiedFiles, formatBytes(res.CopiedBytes))
+		fmt.Fprintf(f, "Already present (resume skip): %d\r\n", res.SkippedSame)
+		if opt.Cut {
+			fmt.Fprintf(f, "Originals deleted: %d\r\n", res.CutFiles)
+			fmt.Fprintf(f, "Delete original failed: %d\r\n", res.CutFailed)
+		}
+		fmt.Fprintf(f, "Failed: %d\r\n", res.Failed)
 	}
-	fmt.Fprintf(f, "\r\n按顶层目录:\r\n")
+	fmt.Fprintf(f, "\r\nBy top-level folder:\r\n")
 	for _, folder := range sum.sortedFolders() {
-		fmt.Fprintf(f, "  %-24s %8d 文件  %s\r\n", folder.Key, folder.Files, formatBytes(folder.Bytes))
+		fmt.Fprintf(f, "  %-24s %8d files  %s\r\n", folder.Key, folder.Files, formatBytes(folder.Bytes))
 	}
 	if failPath != "" {
-		fmt.Fprintf(f, "\r\n失败清单: %s\r\n", failPath)
+		fmt.Fprintf(f, "\r\nFailure list: %s\r\n", failPath)
 	}
 	return nil
 }
@@ -211,7 +473,7 @@ func writeFailCSV(path string, rows [][]string) error {
 		return err
 	}
 	w := csv.NewWriter(f)
-	_ = w.Write([]string{"源路径", "目标路径", "错误"})
+	_ = w.Write([]string{"source", "destination", "error"})
 	for _, row := range rows {
 		_ = w.Write(row)
 	}
@@ -254,4 +516,11 @@ func shortenPath(p string, max int) string {
 	runes := []rune(p)
 	keep := (max - 3) / 2
 	return string(runes[:keep]) + "..." + string(runes[len(runes)-keep:])
+}
+
+func transferTitle(cut bool) string {
+	if cut {
+		return TransferCut.Title()
+	}
+	return TransferCopy.Title()
 }

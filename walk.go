@@ -75,7 +75,7 @@ type itemHandler func(src string, info os.FileInfo) error
 func expandRoot(root string) (string, error) {
 	root = strings.TrimSpace(root)
 	if root == "" {
-		return "", fmt.Errorf("源路径为空")
+		return "", fmt.Errorf("source path is empty")
 	}
 	if len(root) == 2 && root[1] == ':' {
 		root = strings.ToUpper(root[:1]) + `:\`

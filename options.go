@@ -26,11 +26,11 @@ func (m Mode) String() string {
 func (m Mode) Title() string {
 	switch m {
 	case ModePersonal:
-		return "个人资料（用户文档，不含 AppData）"
+		return "Personal files (user documents, no AppData)"
 	case ModeWithAppData:
-		return "个人资料 + 软件配置（推荐，含微信/浏览器等，排除缓存）"
+		return "Personal files + app data (recommended; includes chat/browser data, excludes caches)"
 	case ModeAllNonSystem:
-		return "非系统全量（排除 Windows / 系统卷，不含已安装程序）"
+		return "All non-system files (excludes Windows / system volumes, not installed programs)"
 	default:
 		return ModeWithAppData.Title()
 	}
@@ -38,9 +38,9 @@ func (m Mode) Title() string {
 
 func ParseMode(s string) Mode {
 	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "1", "personal", "p", "文档":
+	case "1", "personal", "p":
 		return ModePersonal
-	case "3", "all", "a", "全量":
+	case "3", "all", "a":
 		return ModeAllNonSystem
 	default:
 		return ModeWithAppData
@@ -54,4 +54,19 @@ type Options struct {
 	DestAbs             string
 	EmployeeName        string
 	ExtraExclude        []string
+	Cut                 bool
+}
+
+type TransferAction int
+
+const (
+	TransferCopy TransferAction = iota
+	TransferCut
+)
+
+func (a TransferAction) Title() string {
+	if a == TransferCut {
+		return "Cut (move: delete originals only after the destination is verified)"
+	}
+	return "Copy (keep originals)"
 }
