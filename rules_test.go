@@ -39,6 +39,9 @@ func TestSkipReason(t *testing.T) {
 		{`C:\work\proj\node_modules`, true, opt, true, "regeneratable directory"},
 		{`C:\work\proj\node_modules`, true, Options{Mode: ModeWithAppData, SkipRegeneratable: false}, false, ""},
 		{`D:\offboarding-archive\alice\C\Users`, true, opt, true, "archive destination"},
+		{`D:\offboarding-archive\alice`, true, opt, true, "archive destination"},
+		{`D:\offboarding-archive\alice\_archive-report.txt`, false, opt, true, "archive destination"},
+		{`D:\offboarding-archive\alice2`, true, opt, false, ""},
 		{`C:\games`, true, Options{ExtraExclude: []string{"games"}}, true, "custom exclude"},
 		{`C:\Intel`, true, all, true, "system/OEM directory"},
 	}

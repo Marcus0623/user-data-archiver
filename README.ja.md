@@ -32,7 +32,7 @@ Windows 用ツール。**OS 以外のユーザーファイル**を別ディス�
 
 ## GUI
 
-`user-data-archiver.exe` または `start-archive.bat` をダブルクリック。氏名、ソース、**保存先**（参照）、**除外**、ドライブ種別／ラベル／空き容量、**読み書きテスト**、モード、Program Files / `node_modules`、プレビュー、開始／停止、ログ。ソースは複数指定できます（カンマまたはセミコロン、例 `C:,D:`）。**参照**は既存の入力を消さず追加します。**プレビューのみ**をオンにすると **開始** は無効になり、**プレビュー** を使います。**開始** は必ず実コピー／カットです。管理者権限は C: の他ユーザーを**読む**ためで、保存先の書き込み権限の代わりにはなりません。`-cli` / `-yes` でウィンドウなし。`-cut` 付きで起動するとカット画面になります。言語は `-lang`：`en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi`。
+`user-data-archiver.exe` または `start-archive.bat` をダブルクリック。氏名、ソース、**保存先**（参照。ソースドライブ上のフォルダーは可、`D:\` 直下は不可）、**除外**、ドライブ種別／ラベル／空き容量、**読み書きテスト**、モード、Program Files / `node_modules`、プレビュー、開始／停止、ログ。ソースは複数指定できます（カンマまたはセミコロン、例 `C:,D:`）。**参照**は既存の入力を消さず追加します。**プレビューのみ**をオンにすると **開始** は無効になり、**プレビュー** を使います。**開始** は必ず実コピー／カットです。管理者権限は C: の他ユーザーを**読む**ためで、保存先の書き込み権限の代わりにはなりません。`-cli` / `-yes` でウィンドウなし。`-cut` 付きで起動するとカット画面になります。言語は `-lang`：`en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi`。
 
 ## 例
 
@@ -54,7 +54,13 @@ Windows 用ツール。**OS 以外のユーザーファイル**を別ディス�
 user-data-archiver.exe -lang ja -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
 ```
 
-保存先は**別ディスクまたは USB**にしてください（スキャン中のソースの中には置かない）。
+USB が無い例：
+
+```bat
+user-data-archiver.exe -lang ja -name alice -src C:,D: -dst D:\offboarding-archive\alice -mode appdata -yes
+```
+
+保存先は**別ディスクまたは USB**が望ましいです。USB が無い場合はソース `C:,D:`、保存先 `D:\offboarding-archive\alice`（`D:\` 直下は不可）。ログに「保存先がソースの中」と出るのは正常です。D: にはコピー分の空きが必要です。プログラムは保存先フォルダー自身をスキップし、入れ子コピーしません。
 
 ## チャット履歴
 
@@ -62,7 +68,7 @@ user-data-archiver.exe -lang ja -name alice -src C:,D:\Projects -dst E:\offboard
 
 ## パス・除外・再開
 
-`D:\C:\Downloads` は不可。ドライブレターがフォルダーになります。保存先は**別ディスクまたは USB**。既定で `Windows`、`Program Files`、キャッシュ、`node_modules` などを除外。**appdata** は `AppData\Roaming` を含む（チャット／ブラウザ、キャッシュ除く）。`Windows.old\Users` は対象。コピーの再開は同一保存先でサイズとタイムスタンプが同じファイルをスキップ。カットは内容照合後にだけ削除。報告 `_archive-report.txt`、失敗 `_failed-files.csv`。
+`D:\C:\Downloads` は不可。ドライブレターがフォルダーになります。保存先は**別ディスクまたは USB**が望ましいです。`C:,D:` を `D:\offboarding-archive\氏名` へ保存することもできます（保存先フォルダーはスキップ、`D:\` ルートは不可）。既定で `Windows`、`Program Files`、キャッシュ、`node_modules` などを除外。**appdata** は `AppData\Roaming` を含む（チャット／ブラウザ、キャッシュ除く）。`Windows.old\Users` は対象。コピーの再開は同一保存先でサイズとタイムスタンプが同じファイルをスキップ。カットは内容照合後にだけ削除。報告 `_archive-report.txt`、失敗 `_failed-files.csv`。
 
 ## ビルドと実行ファイル
 
@@ -74,6 +80,7 @@ user-data-archiver.exe -lang ja -name alice -src C:,D:\Projects -dst E:\offboard
 
 ```bat
 user-data-archiver.exe -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+user-data-archiver.exe -name alice -src C:,D: -dst D:\offboarding-archive\alice -mode appdata -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -dry-run -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -cut -yes
 user-data-archiver.exe -cli
@@ -84,7 +91,7 @@ user-data-archiver.exe -lang ja
 | --- | --- |
 | `-name` | 氏名（レポートと既定フォルダー名） |
 | `-src` | ソース（カンマ区切り） |
-| `-dst` | 保存先フォルダー |
+| `-dst` | 保存先フォルダー（ソースドライブ上は可、`D:\` ルートは不可） |
 | `-mode` | `personal` \| `appdata` \| `all`（既定 `appdata`） |
 | `-include-program-files` | Program Files / ProgramData も含める |
 | `-include-regeneratable` | `node_modules` なども含める |

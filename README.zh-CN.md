@@ -36,7 +36,7 @@ Windows 工具：把**非系统用户文件**归档到另一块硬盘或 U 盘�
 
 - **姓名**：报告和默认目标文件夹名
 - **源路径**：可同时填多块磁盘或多个文件夹，逗号或分号分隔，例如 `C:`、`C:,D:`、`C:\Users;E:\data`。点 **浏览** 会**追加**到列表，不会覆盖已有路径；重复项会跳过。要去掉某一项，在框里删除即可
-- **保存到**：最终归档目录，可浏览（默认 `D:\offboarding-archive\<姓名>`）
+- **保存到**：最终归档目录，可浏览（默认 `D:\offboarding-archive\<姓名>`）。可以放在源盘上的文件夹里；不能是 `D:\` 这种盘符根目录
 - 目标盘类型、卷标、剩余空间
 - **读写测试**：创建、写入、读回并删除 `_write-test.tmp`；光驱、未解锁、写保护、无权限会失败
 - 模式：个人文件 / 个人+应用数据 / 所有非系统文件
@@ -88,11 +88,31 @@ user-data-archiver.exe -lang zh-CN -name xiaowang -src C:,D:\Projects -dst E:\of
 user-data-archiver.exe -lang zh-CN -name xiaowang -src C:,D:\Projects -dst E:\offboarding-archive\xiaowang -dry-run -yes
 ```
 
-**保存到** 不要放在正在扫描的源路径里面（例如源是 `C:` 却存到 `C:\offboarding-archive`）。请放到另一块盘或 U 盘。
+### 没有 U 盘：源包含目标盘（C: 和 D: 都拷到 D:）
+
+没有 E: 盘时，仍可以把 **C: 和 D:** 拷到 **D: 上的专用文件夹**。不要填 `D:\` 根目录。
+
+1. **源路径：** `C:,D:`（或 `C:,D:\Projects`）
+2. **保存到：** `D:\offboarding-archive\xiaowang` — 不要填 `D:\`
+3. **读写测试**，再 **预览**。日志会警告「目标位于源路径内部」，这是正常的。
+4. 确认 D 盘剩余空间够再放**一整份**要归档的文件（C 盘那份 + D 盘那份），然后 **开始复制**。
+
+| 小王电脑上 | 归档里 |
+| --- | --- |
+| `C:\Downloads\合同.pdf` | `D:\offboarding-archive\xiaowang\C\Downloads\合同.pdf` |
+| `D:\Projects\api\readme.md` | `D:\offboarding-archive\xiaowang\D\Projects\api\readme.md` |
+
+扫描 D 盘时会**跳过归档目录本身**，不会把已经拷进去的文件再拷一层。再跑一次也不会越拷越深。
+
+```bat
+user-data-archiver.exe -lang zh-CN -name xiaowang -src C:,D: -dst D:\offboarding-archive\xiaowang -mode appdata -yes
+```
+
+**保存到** 不能是盘符根目录（`C:\`、`D:\`），读写测试会拒绝。有 U 盘或第三块盘时优先用；拷到同一块 D 盘可以，但 D 盘要多占一份空间。
 
 ## 路径
 
-不能使用 `D:\C:\Downloads`。盘符变成文件夹，例如 `C:\Downloads\a.zip` → `D:\offboarding-archive\alice\C\Downloads\a.zip`。请把目标放在**另一块盘或 U 盘**。相同目标的联接/符号链接只存一份。支持超长路径。
+不能使用 `D:\C:\Downloads`。盘符变成文件夹，例如 `C:\Downloads\a.zip` → `D:\offboarding-archive\alice\C\Downloads\a.zip`。有条件时请把目标放在**另一块盘或 U 盘**。也可以扫 `C:,D:` 并存到 `D:\offboarding-archive\姓名`：程序会跳过该归档文件夹，避免拷进自己；预览会提示目标在源路径内部；D 盘需要能再放下要拷的全部文件。不能把 `D:\` 整盘当作保存位置。相同目标的联接/符号链接只存一份。支持超长路径。
 
 ## 跳过与拷贝
 
@@ -144,6 +164,7 @@ user-data-archiver.exe -lang zh-CN -name xiaowang -src C:,D:\Projects -dst E:\of
 
 ```bat
 user-data-archiver.exe -lang zh-CN -name xiaowang -src C:,D:\Projects -dst E:\offboarding-archive\xiaowang -mode appdata -yes
+user-data-archiver.exe -lang zh-CN -name xiaowang -src C:,D: -dst D:\offboarding-archive\xiaowang -mode appdata -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\xiaowang -dry-run -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\xiaowang -cut -yes
 user-data-archiver.exe -cli
@@ -154,7 +175,7 @@ user-data-archiver.exe -lang zh-CN
 | --- | --- |
 | `-name` | 姓名（报告和默认文件夹名） |
 | `-src` | 源路径，逗号或分号分隔（`C:`、`C:,D:` 或 `C:\Users;E:\data`） |
-| `-dst` | 最终归档目录 |
+| `-dst` | 最终归档目录（可放在源盘上的文件夹；不能是 `D:\` 这种盘符根目录） |
 | `-mode` | `personal` \| `appdata` \| `all`（默认 `appdata`） |
 | `-include-program-files` | 同时包含 Program Files / ProgramData |
 | `-include-regeneratable` | 包含 `node_modules`、`__pycache__` 等 |

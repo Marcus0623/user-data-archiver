@@ -32,7 +32,7 @@ Le mode couper redemande confirmation (Non par défaut). L’aperçu ne copie ni
 
 ## Fenêtre
 
-Double-clic sur `user-data-archiver.exe` ou `start-archive.bat`. Ensuite : nom, source, **Enregistrer vers** (Parcourir), **Exclure**, type/libellé/espace libre du disque, **Test lecture/écriture**, mode, options Program Files / `node_modules`, aperçu, démarrer / arrêter, journal. La source accepte plusieurs chemins (virgule ou point-virgule, ex. `C:,D:`). **Parcourir** ajoute sans effacer le champ. Si **Aperçu uniquement** est coché, utilisez **Aperçu**. **Démarrer** copie ou coupe vraiment. Les droits administrateur servent à **lire** les autres profils sur C:, pas à écrire sur la destination. `-cli` ou `-yes` : pas de fenêtre. `-cut` ouvre directement le mode couper. Langue : `-lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi`).
+Double-clic sur `user-data-archiver.exe` ou `start-archive.bat`. Ensuite : nom, source, **Enregistrer vers** (Parcourir ; un dossier sur un disque source est permis, pas la racine `D:\`), **Exclure**, type/libellé/espace libre du disque, **Test lecture/écriture**, mode, options Program Files / `node_modules`, aperçu, démarrer / arrêter, journal. La source accepte plusieurs chemins (virgule ou point-virgule, ex. `C:,D:`). **Parcourir** ajoute sans effacer le champ. Si **Aperçu uniquement** est coché, utilisez **Aperçu**. **Démarrer** copie ou coupe vraiment. Les droits administrateur servent à **lire** les autres profils sur C:, pas à écrire sur la destination. `-cli` ou `-yes` : pas de fenêtre. `-cut` ouvre directement le mode couper. Langue : `-lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi`).
 
 ## Exemple
 
@@ -54,7 +54,13 @@ Le dossier contient aussi `_archive-report.txt`. En ligne de commande :
 user-data-archiver.exe -lang fr -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
 ```
 
-Placez la destination sur **un autre disque ou USB**, pas à l’intérieur d’une source.
+Sans USB :
+
+```bat
+user-data-archiver.exe -lang fr -name alice -src C:,D: -dst D:\offboarding-archive\alice -mode appdata -yes
+```
+
+Placez la destination sur **un autre disque ou USB** si possible. Sans USB : source `C:,D:`, destination `D:\offboarding-archive\alice` (pas `D:\`). Un avertissement « destination dans la source » est normal ; le dossier d’archive est ignoré pour ne pas se copier en lui-même. D: doit avoir assez d’espace pour une **seconde** copie.
 
 ## Messagerie
 
@@ -62,7 +68,7 @@ Le mode **appdata** (recommandé) archive les discussions **déjà présentes su
 
 ## Chemins, filtres, reprise
 
-Pas de `D:\C:\Downloads` : la lettre de lecteur devient un dossier. Destination sur **un autre disque ou USB**. Ignore `Windows`, `Program Files`, caches, `node_modules`, etc. Mode **appdata** : `AppData\Roaming` (messagerie/navigateur) sans caches. `Windows.old\Users` est inclus. Reprise de copie sur la **même destination** si taille et date identiques. Couper ne supprime qu’après comparaison du contenu. Rapport `_archive-report.txt` ; échecs `_failed-files.csv`.
+Pas de `D:\C:\Downloads` : la lettre de lecteur devient un dossier. Destination de préférence sur **un autre disque ou USB**. `C:,D:` vers `D:\offboarding-archive\<nom>` est permis (le dossier d’archive est ignoré ; `D:\` racine est refusé). Ignore `Windows`, `Program Files`, caches, `node_modules`, etc. Mode **appdata** : `AppData\Roaming` (messagerie/navigateur) sans caches. `Windows.old\Users` est inclus. Reprise de copie sur la **même destination** si taille et date identiques. Couper ne supprime qu’après comparaison du contenu. Rapport `_archive-report.txt` ; échecs `_failed-files.csv`.
 
 ## Compilation et exécutable
 
@@ -74,6 +80,7 @@ Un seul `user-data-archiver.exe` dans ce dossier. `build.bat` supprime les autre
 
 ```bat
 user-data-archiver.exe -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+user-data-archiver.exe -name alice -src C:,D: -dst D:\offboarding-archive\alice -mode appdata -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -dry-run -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -cut -yes
 user-data-archiver.exe -cli
@@ -84,7 +91,7 @@ user-data-archiver.exe -lang fr
 | --- | --- |
 | `-name` | Nom (rapport et dossier par défaut) |
 | `-src` | Sources, séparées par des virgules |
-| `-dst` | Dossier de destination |
+| `-dst` | Dossier de destination (un dossier sur un disque source est permis ; pas `D:\`) |
 | `-mode` | `personal` \| `appdata` \| `all` (défaut `appdata`) |
 | `-include-program-files` | Inclure aussi Program Files / ProgramData |
 | `-include-regeneratable` | Inclure `node_modules`, `__pycache__`, etc. |

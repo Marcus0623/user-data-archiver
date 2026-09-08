@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -81,6 +82,46 @@ func TestIsBaseOf(t *testing.T) {
 	}
 	if !samePath(base, base) {
 		t.Fatal("samePath should match a path to itself")
+	}
+}
+
+func TestIsBaseOfWhenDestDoesNotExistYet(t *testing.T) {
+	disk := t.TempDir()
+	dest := filepath.Join(disk, "offboarding-archive", "alice")
+	if !isBaseOf(disk, dest) {
+		t.Fatal("a destination folder inside the source must be detected before it is created")
+	}
+	if isBaseOf(disk, filepath.Join(disk+"2", "x")) {
+		t.Fatal("a similarly named sibling folder must not count as inside the source")
+	}
+}
+
+func TestIsVolumeRoot(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip()
+	}
+	if !isVolumeRoot(`C:\`) || !isVolumeRoot(`C:`) || !isVolumeRoot(`D:\`) {
+		t.Fatal("drive roots should be detected")
+	}
+	if isVolumeRoot(`C:\Users`) || isVolumeRoot(`D:\offboarding-archive\alice`) {
+		t.Fatal("a folder on a drive is not a drive root")
+	}
+}
+
+func TestProbeDestRejectsDriveRoot(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip()
+	}
+	setLang(LangEN)
+	err := probeDestWritable(`C:\`)
+	if err == nil {
+		t.Fatal("drive root must be rejected")
+	}
+	if !strings.Contains(err.Error(), "cannot be a drive root") {
+		t.Fatalf("got %v", err)
+	}
+	if _, statErr := os.Stat(`C:\_write-test.tmp`); statErr == nil {
+		t.Fatal("probe must not write _write-test.tmp to the drive root")
 	}
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -76,21 +77,54 @@ func lowerComponents(rel string) []string {
 	return parts
 }
 
-func isBaseOf(base, target string) bool {
-	base = normalizeAbs(base)
-	target = normalizeAbs(target)
-	rel, err := filepath.Rel(base, target)
+func existingCanonical(p string) string {
+	p = stripLongPath(strings.TrimSpace(p))
+	if p == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(p)
 	if err != nil {
+		return strings.ToLower(filepath.Clean(p))
+	}
+	abs = filepath.Clean(abs)
+	cur := abs
+	var missing []string
+	for {
+		if _, err := os.Lstat(cur); err == nil {
+			long := getLongPathName(cur)
+			if len(missing) == 0 {
+				return strings.ToLower(long)
+			}
+			parts := make([]string, 0, 1+len(missing))
+			parts = append(parts, long)
+			for i := len(missing) - 1; i >= 0; i-- {
+				parts = append(parts, missing[i])
+			}
+			return strings.ToLower(filepath.Join(parts...))
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return strings.ToLower(abs)
+		}
+		missing = append(missing, filepath.Base(cur))
+		cur = parent
+	}
+}
+
+func isBaseOf(base, target string) bool {
+	base = strings.TrimRight(existingCanonical(base), `\`)
+	target = strings.TrimRight(existingCanonical(target), `\`)
+	if base == "" || target == "" {
 		return false
 	}
-	if rel == "." {
+	if base == target {
 		return true
 	}
-	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	return strings.HasPrefix(target, base+string(filepath.Separator))
 }
 
 func samePath(a, b string) bool {
-	return strings.EqualFold(normalizeAbs(a), normalizeAbs(b))
+	return existingCanonical(a) == existingCanonical(b)
 }
 
 func stripWindowsOldPrefix(parts []string) []string {

@@ -60,10 +60,27 @@ func isReservedWindowsName(name string) bool {
 	return false
 }
 
+func isVolumeRoot(p string) bool {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return false
+	}
+	p = normalizeAbs(p)
+	vol := filepath.VolumeName(p)
+	if vol == "" {
+		return false
+	}
+	rest := strings.Trim(strings.TrimPrefix(p, vol), `\/`)
+	return rest == ""
+}
+
 func probeDestWritable(dest string) error {
 	vol := filepath.VolumeName(dest)
 	if vol == "" {
 		return fmt.Errorf("%s", T("ErrDestDrive", dest))
+	}
+	if isVolumeRoot(dest) {
+		return fmt.Errorf("%s", T("ErrDestDriveRoot"))
 	}
 	root := vol + `\`
 	kind := driveKind(root)

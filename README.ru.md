@@ -32,7 +32,7 @@
 
 ## Окно
 
-Двойной щелчок по `user-data-archiver.exe` или `start-archive.bat`. Далее: имя, источник, **Сохранить в**, **Исключить**, тип/метка/свободное место диска, **Тест чтения/записи**, режим, Program Files / `node_modules`, просмотр, старт / стоп, журнал. Источник: несколько путей через запятую или точку с запятой (`C:,D:`). **Обзор** добавляет путь, не затирая поле. Если включён **только предпросмотр**, используйте **Предпросмотр**. **Старт** всегда копирует или вырезает. Права администратора нужны, чтобы **читать** чужие профили на C:, а не чтобы писать на диск назначения. `-cli` / `-yes` — без окон. `-cut` сразу открывает режим вырезания. Язык: `-lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi`).
+Двойной щелчок по `user-data-archiver.exe` или `start-archive.bat`. Далее: имя, источник, **Сохранить в** (папка на исходном диске разрешена, корень `D:\` — нет), **Исключить**, тип/метка/свободное место диска, **Тест чтения/записи**, режим, Program Files / `node_modules`, просмотр, старт / стоп, журнал. Источник: несколько путей через запятую или точку с запятой (`C:,D:`). **Обзор** добавляет путь, не затирая поле. Если включён **только предпросмотр**, используйте **Предпросмотр**. **Старт** всегда копирует или вырезает. Права администратора нужны, чтобы **читать** чужие профили на C:, а не чтобы писать на диск назначения. `-cli` / `-yes` — без окон. `-cut` сразу открывает режим вырезания. Язык: `-lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi`).
 
 ## Пример
 
@@ -54,7 +54,13 @@ Alice увольняется. Система и профиль на `C:`, про
 user-data-archiver.exe -lang ru -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
 ```
 
-Пишите на **другой диск или USB**, не внутрь сканируемого источника.
+Без USB:
+
+```bat
+user-data-archiver.exe -lang ru -name alice -src C:,D: -dst D:\offboarding-archive\alice -mode appdata -yes
+```
+
+Пишите на **другой диск или USB**, если можно. Без USB: источник `C:,D:`, назначение `D:\offboarding-archive\alice` (не `D:\`). Предупреждение «назначение внутри источника» — нормально; папка архива пропускается, чтобы не копировать саму себя. На D: должно хватить места на **вторую** копию.
 
 ## Чаты
 
@@ -62,7 +68,7 @@ user-data-archiver.exe -lang ru -name alice -src C:,D:\Projects -dst E:\offboard
 
 ## Пути, исключения, докачка
 
-Нельзя `D:\C:\Downloads`: буква диска становится папкой. Пишите на **другой диск или USB**. Пропускаются `Windows`, `Program Files`, кэши, `node_modules`. В **appdata** копируется `AppData\Roaming` (мессенджеры/браузер) без кэша. `Windows.old\Users` включается. Повтор **копирования** на ту же папку пропускает файлы с тем же размером и временем. Вырезание удаляет только после сверки содержимого. Отчёт `_archive-report.txt`, ошибки `_failed-files.csv`.
+Нельзя `D:\C:\Downloads`: буква диска становится папкой. Лучше писать на **другой диск или USB**. Можно сканировать `C:,D:` и сохранять в `D:\offboarding-archive\<имя>` (папка архива пропускается; корень `D:\` запрещён). Пропускаются `Windows`, `Program Files`, кэши, `node_modules`. В **appdata** копируется `AppData\Roaming` (мессенджеры/браузер) без кэша. `Windows.old\Users` включается. Повтор **копирования** на ту же папку пропускает файлы с тем же размером и временем. Вырезание удаляет только после сверки содержимого. Отчёт `_archive-report.txt`, ошибки `_failed-files.csv`.
 
 ## Сборка и exe
 
@@ -74,6 +80,7 @@ user-data-archiver.exe -lang ru -name alice -src C:,D:\Projects -dst E:\offboard
 
 ```bat
 user-data-archiver.exe -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+user-data-archiver.exe -name alice -src C:,D: -dst D:\offboarding-archive\alice -mode appdata -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -dry-run -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -cut -yes
 user-data-archiver.exe -cli
@@ -84,7 +91,7 @@ user-data-archiver.exe -lang ru
 | --- | --- |
 | `-name` | Имя (отчёт и папка по умолчанию) |
 | `-src` | Источники через запятую |
-| `-dst` | Папка назначения |
+| `-dst` | Папка назначения (на исходном диске можно; корень `D:\` нельзя) |
 | `-mode` | `personal` \| `appdata` \| `all` (по умолчанию `appdata`) |
 | `-include-program-files` | Включить Program Files / ProgramData |
 | `-include-regeneratable` | Включить `node_modules`, `__pycache__` и т.п. |

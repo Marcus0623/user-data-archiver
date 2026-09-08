@@ -32,7 +32,7 @@ Cut hỏi lại trước khi đổi file (mặc định No). Preview không copy
 
 ## Giao diện
 
-Nhấp đúp `user-data-archiver.exe` hoặc `start-archive.bat`. Sau đó: tên, nguồn, **Lưu vào** (Duyệt), **Loại trừ**, loại ổ / nhãn / dung lượng trống, **Kiểm tra đọc/ghi**, mode, tùy chọn Program Files / `node_modules`, preview, Start / Stop, nhật ký. Nguồn có thể nhiều đường dẫn (phẩy hoặc chấm phẩy, ví dụ `C:,D:`). **Duyệt** sẽ thêm, không xóa ô sẵn có. Khi **Chỉ xem trước** được chọn, dùng **Xem trước**. **Bắt đầu** luôn copy hoặc cut thật. Quyền administrator để **đọc** hồ sơ khác trên C:, không thay quyền ghi ổ đích. `-cli` hoặc `-yes` không mở cửa sổ. `-cut` mở thẳng cửa sổ Cut. Ngôn ngữ: `-lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi`).
+Nhấp đúp `user-data-archiver.exe` hoặc `start-archive.bat`. Sau đó: tên, nguồn, **Lưu vào** (Duyệt; thư mục trên ổ nguồn được phép, không dùng gốc `D:\`), **Loại trừ**, loại ổ / nhãn / dung lượng trống, **Kiểm tra đọc/ghi**, mode, tùy chọn Program Files / `node_modules`, preview, Start / Stop, nhật ký. Nguồn có thể nhiều đường dẫn (phẩy hoặc chấm phẩy, ví dụ `C:,D:`). **Duyệt** sẽ thêm, không xóa ô sẵn có. Khi **Chỉ xem trước** được chọn, dùng **Xem trước**. **Bắt đầu** luôn copy hoặc cut thật. Quyền administrator để **đọc** hồ sơ khác trên C:, không thay quyền ghi ổ đích. `-cli` hoặc `-yes` không mở cửa sổ. `-cut` mở thẳng cửa sổ Cut. Ngôn ngữ: `-lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi`).
 
 ## Ví dụ
 
@@ -54,7 +54,13 @@ Cùng thư mục có `_archive-report.txt`. Dòng lệnh:
 user-data-archiver.exe -lang vi -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
 ```
 
-Đích nên là **ổ khác hoặc USB**, không nằm trong nguồn đang quét.
+Không USB:
+
+```bat
+user-data-archiver.exe -lang vi -name alice -src C:,D: -dst D:\offboarding-archive\alice -mode appdata -yes
+```
+
+Đích nên là **ổ khác hoặc USB** nếu có. Không có USB: nguồn `C:,D:`, đích `D:\offboarding-archive\alice` (không dùng `D:\`). Cảnh báo “đích nằm trong nguồn” là bình thường; thư mục lưu trữ bị bỏ qua nên không tự sao vào chính nó. Ổ D: cần đủ chỗ cho **một bản sao thêm**.
 
 ## Chat
 
@@ -62,7 +68,7 @@ Chế độ **appdata** lưu dữ liệu chat **đã có trên máy**, ví dụ 
 
 ## Đường dẫn, lọc, tiếp tục
 
-Không dùng `D:\C:\Downloads`. Ký tự ổ thành thư mục. Đích nên là **ổ khác hoặc USB**. Bỏ `Windows`, `Program Files`, cache, `node_modules`. **appdata** gồm `AppData\Roaming` (chat/trình duyệt, không cache). Có `Windows.old\Users`. Chạy lại copy **cùng thư mục đích** sẽ bỏ qua file trùng size và thời gian. Cut chỉ xóa sau khi đối chiếu nội dung. Báo cáo `_archive-report.txt`, lỗi `_failed-files.csv`.
+Không dùng `D:\C:\Downloads`. Ký tự ổ thành thư mục. Ưu tiên đích **ổ khác hoặc USB**. Có thể quét `C:,D:` và lưu vào `D:\offboarding-archive\<tên>` (bỏ qua thư mục đích; không dùng gốc `D:\`). Bỏ `Windows`, `Program Files`, cache, `node_modules`. **appdata** gồm `AppData\Roaming` (chat/trình duyệt, không cache). Có `Windows.old\Users`. Chạy lại copy **cùng thư mục đích** sẽ bỏ qua file trùng size và thời gian. Cut chỉ xóa sau khi đối chiếu nội dung. Báo cáo `_archive-report.txt`, lỗi `_failed-files.csv`.
 
 ## Biên dịch và file exe
 
@@ -74,6 +80,7 @@ Chỉ giữ **một** `user-data-archiver.exe` trong thư mục. `build.bat` xó
 
 ```bat
 user-data-archiver.exe -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+user-data-archiver.exe -name alice -src C:,D: -dst D:\offboarding-archive\alice -mode appdata -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -dry-run -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -cut -yes
 user-data-archiver.exe -cli
@@ -84,7 +91,7 @@ user-data-archiver.exe -lang vi
 | --- | --- |
 | `-name` | Tên (báo cáo và thư mục mặc định) |
 | `-src` | Đường dẫn nguồn, cách nhau bằng dấu phẩy |
-| `-dst` | Thư mục đích |
+| `-dst` | Thư mục đích (trên ổ nguồn được phép; không dùng gốc `D:\`) |
 | `-mode` | `personal` \| `appdata` \| `all` (mặc định `appdata`) |
 | `-include-program-files` | Gồm cả Program Files / ProgramData |
 | `-include-regeneratable` | Gồm `node_modules`, `__pycache__`, v.v. |

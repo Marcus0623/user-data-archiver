@@ -91,7 +91,7 @@ func expandRoot(root string) (string, error) {
 	if _, err := os.Lstat(root); err != nil {
 		return "", err
 	}
-	return filepath.Clean(root), nil
+	return normalizeAbs(filepath.Clean(root)), nil
 }
 
 func isReparsePoint(info os.FileInfo) bool {

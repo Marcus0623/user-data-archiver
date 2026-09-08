@@ -32,7 +32,7 @@ Windows 工具：將**非系統使用者檔案**歸檔到另一顆硬碟或 USB�
 
 ## 圖形介面
 
-按兩下 `user-data-archiver.exe` 或 `start-archive.bat`。選擇複製／剪下後可設定姓名、來源、**儲存到**（瀏覽）、**排除**、磁碟類型／標籤／剩餘空間、**讀寫測試**、模式、是否包含 Program Files 與 `node_modules`、僅預覽、開始／停止與日誌。來源可填多個路徑（逗號或分號，例如 `C:,D:`）；**瀏覽**會追加，不會清空已有路徑。勾選 **僅預覽** 時請用 **預覽**；**開始**一定是真正傳檔。系統管理員用來**讀取** C 槽其他使用者，**不能取代**目的碟寫入權限。`-cli` 或 `-yes` 不開視窗。雙擊程式時若加 `-cut`，會直接進入剪下視窗。介面語言可用 `-lang`：`en`、`zh-CN`、`zh-TW`、`ja`、`fr`、`ru`、`vi`。
+按兩下 `user-data-archiver.exe` 或 `start-archive.bat`。選擇複製／剪下後可設定姓名、來源、**儲存到**（瀏覽；來源磁碟上的資料夾可以，但不能是 `D:\` 這種根目錄）、**排除**、磁碟類型／標籤／剩餘空間、**讀寫測試**、模式、是否包含 Program Files 與 `node_modules`、僅預覽、開始／停止與日誌。來源可填多個路徑（逗號或分號，例如 `C:,D:`）；**瀏覽**會追加，不會清空已有路徑。勾選 **僅預覽** 時請用 **預覽**；**開始**一定是真正傳檔。系統管理員用來**讀取** C 槽其他使用者，**不能取代**目的碟寫入權限。`-cli` 或 `-yes` 不開視窗。雙擊程式時若加 `-cut`，會直接進入剪下視窗。介面語言可用 `-lang`：`en`、`zh-CN`、`zh-TW`、`ja`、`fr`、`ru`、`vi`。
 
 ## 範例
 
@@ -54,7 +54,13 @@ Windows 工具：將**非系統使用者檔案**歸檔到另一顆硬碟或 USB�
 user-data-archiver.exe -lang zh-TW -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
 ```
 
-請把目的地放在**另一顆碟或 USB**，不要放在正在掃描的來源裡面。
+沒有 USB 時，來源填 `C:,D:`，儲存到 `D:\offboarding-archive\alice`（不要填 `D:\`）。日誌出現「目的地位於來源內部」是正常的。D 槽要有足夠空間再放一份。
+
+```bat
+user-data-archiver.exe -lang zh-TW -name alice -src C:,D: -dst D:\offboarding-archive\alice -mode appdata -yes
+```
+
+請把目的地放在**另一顆碟或 USB**（若可以）。也可以掃 `C:,D:` 並存到 `D:\offboarding-archive\alice`：程式會略過該封存資料夾，避免拷進自己；預覽會警告目的地在來源內部；D 槽需要能再放下要拷的全部檔案。不能把 `D:\` 整碟當目的地。
 
 ## 聊天紀錄
 
@@ -62,7 +68,7 @@ user-data-archiver.exe -lang zh-TW -name alice -src C:,D:\Projects -dst E:\offbo
 
 ## 路徑與規則
 
-不可使用 `D:\C:\Downloads`。磁碟機代號變成資料夾。請把目的地放在**另一顆碟或 USB**。預設略過 `Windows`、回收筒、`Program Files`、OEM、快取、`node_modules` 等；**appdata** 會收 `AppData\Roaming`（聊天／瀏覽器，不含快取）。會收 `Windows.old\Users`。複製中斷後對同一目的地可依大小與時間續傳；剪下仍會核對內容。報告 `_archive-report.txt`，失敗 `_failed-files.csv`。
+不可使用 `D:\C:\Downloads`。磁碟機代號變成資料夾。目的地優先放在**另一顆碟或 USB**；掃 `C:,D:` 存到 `D:\offboarding-archive\姓名` 也可以，程式會略過封存資料夾。不能用 `D:\` 根目錄。預設略過 `Windows`、回收筒、`Program Files`、OEM、快取、`node_modules` 等；**appdata** 會收 `AppData\Roaming`（聊天／瀏覽器，不含快取）。會收 `Windows.old\Users`。複製中斷後對同一目的地可依大小與時間續傳；剪下仍會核對內容。報告 `_archive-report.txt`，失敗 `_failed-files.csv`。
 
 ## 編譯與執行檔
 
@@ -74,6 +80,7 @@ user-data-archiver.exe -lang zh-TW -name alice -src C:,D:\Projects -dst E:\offbo
 
 ```bat
 user-data-archiver.exe -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+user-data-archiver.exe -name alice -src C:,D: -dst D:\offboarding-archive\alice -mode appdata -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -dry-run -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -cut -yes
 user-data-archiver.exe -cli
@@ -84,7 +91,7 @@ user-data-archiver.exe -lang zh-TW
 | --- | --- |
 | `-name` | 姓名（報告與預設資料夾名） |
 | `-src` | 來源路徑，逗號分隔 |
-| `-dst` | 最終歸檔目錄 |
+| `-dst` | 最終歸檔目錄（來源磁碟上的資料夾可以；不能是 `D:\` 根目錄） |
 | `-mode` | `personal` \| `appdata` \| `all`（預設 `appdata`） |
 | `-include-program-files` | 同時包含 Program Files / ProgramData |
 | `-include-regeneratable` | 包含 `node_modules`、`__pycache__` 等 |

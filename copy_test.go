@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -753,5 +754,120 @@ func TestWriteFailCSVHeadersChinese(t *testing.T) {
 	text := string(b)
 	if !strings.Contains(text, "源路径") || !strings.Contains(text, "目标路径") {
 		t.Fatalf("CSV headers:\n%s", text)
+	}
+}
+
+func countNamedFiles(t *testing.T, root, name string) int {
+	t.Helper()
+	n := 0
+	err := filepath.WalkDir(root, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && strings.EqualFold(d.Name(), name) {
+			n++
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func TestArchiveDestInsideSourceSkipsDestTree(t *testing.T) {
+	disk := t.TempDir()
+	keep := filepath.Join(disk, "keep")
+	if err := os.MkdirAll(keep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(keep, "a.txt"), []byte("from-source"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(disk, "offboarding-archive", "alice")
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(dest, "already.txt")
+	if err := os.WriteFile(marker, []byte("DEST-ONLY-MARKER"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	opt := Options{Mode: ModeWithAppData, DestAbs: dest}
+	sum, err := Scan(context.Background(), []string{disk}, opt, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sum.Files != 1 {
+		t.Fatalf("scan must ignore files already in dest, got %d files", sum.Files)
+	}
+
+	if _, err := Archive(context.Background(), []string{disk}, opt, dest, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	mapped, err := MapDest(filepath.Join(keep, "a.txt"), dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(mapped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "from-source" {
+		t.Fatalf("kept source file: %q", got)
+	}
+	if countNamedFiles(t, dest, "already.txt") != 1 {
+		t.Fatal("dest marker must not be copied into itself")
+	}
+	nested, err := MapDest(marker, dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(nested); !os.IsNotExist(err) {
+		t.Fatalf("dest tree was copied into dest: %s", nested)
+	}
+
+	if _, err := Archive(context.Background(), []string{disk}, opt, dest, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if countNamedFiles(t, dest, "already.txt") != 1 {
+		t.Fatal("second run must not nest dest files")
+	}
+}
+
+func TestArchiveCutDestInsideSourceKeepsDestFiles(t *testing.T) {
+	disk := t.TempDir()
+	keepFile := filepath.Join(disk, "keep", "a.txt")
+	if err := os.MkdirAll(filepath.Dir(keepFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keepFile, []byte("cut-me"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(disk, "offboarding-archive", "alice")
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(dest, "already.txt")
+	if err := os.WriteFile(marker, []byte("DEST-ONLY-MARKER"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	opt := Options{Mode: ModeWithAppData, DestAbs: dest, Cut: true}
+	if _, err := Archive(context.Background(), []string{disk}, opt, dest, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(keepFile); !os.IsNotExist(err) {
+		t.Fatal("source outside dest should be cut")
+	}
+	got, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "DEST-ONLY-MARKER" {
+		t.Fatalf("cut must not delete files already in dest: %q", got)
+	}
+	if countNamedFiles(t, dest, "already.txt") != 1 {
+		t.Fatal("cut must not duplicate dest marker")
 	}
 }

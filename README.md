@@ -36,7 +36,7 @@ Double-click `user-data-archiver.exe` or `start-archive.bat`. The exe is built a
 
 - **Person name** — used in the report and in the default destination folder
 - **Source** — one or more drives or folders, separated by commas or semicolons (`C:`, `C:,D:`, or `C:\Users;E:\data`). **Browse** adds a folder and does not clear paths already in the box; duplicates are skipped. Delete an entry in the box to remove it
-- **Save to** — final archive folder; **Browse...** (default `D:\offboarding-archive\<name>`)
+- **Save to** — final archive folder; **Browse...** (default `D:\offboarding-archive\<name>`). A folder on a source drive is allowed; a drive root such as `D:\` is not
 - Drive line — type (local disk / USB / network / CD-ROM), volume label, free space
 - **Read/Write Test** — create, write, read, and delete `_write-test.tmp`. Refuses CD-ROM, missing/locked disks, write-protect, and access denied
 - **Mode** — personal / appdata / all
@@ -90,7 +90,27 @@ Preview only (no copy):
 user-data-archiver.exe -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -dry-run -yes
 ```
 
-Do **not** set **Save to** to a folder inside a source path (for example `C:\offboarding-archive` while scanning `C:`). Put the archive on another volume.
+### Destination on D: while D: is also a source
+
+No USB stick? You can still copy **C: and D:** onto **D:**. Use a dedicated folder, not the drive root.
+
+1. **Source:** `C:,D:` (or `C:,D:\Projects`)
+2. **Save to:** `D:\offboarding-archive\alice` — not `D:\`
+3. **Read/Write Test**, then **Preview**. The log warns that the destination is inside a source path; that is expected.
+4. Confirm free space on D: is enough for a **second** copy of everything being archived, then **Start Copy**.
+
+| On Alice’s PC | In the archive |
+| --- | --- |
+| `C:\Downloads\contract.pdf` | `D:\offboarding-archive\alice\C\Downloads\contract.pdf` |
+| `D:\Projects\api\readme.md` | `D:\offboarding-archive\alice\D\Projects\api\readme.md` |
+
+The program **skips the archive folder itself** while walking D:, so it will not copy `D:\offboarding-archive\alice` into itself. Already-copied files stay put; they are not nested deeper on a second run.
+
+```bat
+user-data-archiver.exe -name alice -src C:,D: -dst D:\offboarding-archive\alice -mode appdata -yes
+```
+
+Do **not** set **Save to** to a drive root (`C:\`, `D:\`). Read/Write Test refuses that. Prefer another disk or USB when you can; saving onto D: works but uses extra space on D:.
 
 ## Path layout
 
@@ -101,7 +121,7 @@ Windows cannot create `D:\C:\Downloads`. The drive letter becomes a folder:
 | `C:\Downloads\notes.zip` | `D:\offboarding-archive\alice\C\Downloads\notes.zip` |
 | `C:\Users\alice\Desktop\a.docx` | `D:\offboarding-archive\alice\C\Users\alice\Desktop\a.docx` |
 
-Put the destination on **another disk or USB**, not the volume you are scanning. Junctions/symlinks that point at the same place are stored once. Long paths are supported.
+Put the destination on **another disk or USB** when you can. Saving onto a source drive is supported: scan `C:,D:` and save to `D:\offboarding-archive\alice`. The archive folder is skipped so it is not copied into itself; Preview logs a warning. Copy needs free space for another full copy of the selected files. The destination **cannot** be a drive root such as `D:\`. Junctions/symlinks that point at the same place are stored once. Long paths are supported.
 
 ## What is skipped vs copied
 
@@ -153,6 +173,7 @@ You can copy the finished `user-data-archiver.exe` (and optionally `start-archiv
 
 ```bat
 user-data-archiver.exe -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+user-data-archiver.exe -name alice -src C:,D: -dst D:\offboarding-archive\alice -mode appdata -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -dry-run -yes
 user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -cut -yes
 user-data-archiver.exe -cli
@@ -163,7 +184,7 @@ user-data-archiver.exe -lang zh-CN
 | --- | --- |
 | `-name` | Person name (report and default folder name) |
 | `-src` | Source paths, comma or semicolon (`C:`, `C:,D:`, or `C:\Users;E:\data`) |
-| `-dst` | Final destination folder |
+| `-dst` | Final destination folder (a folder on a source drive is allowed; a drive root such as `D:\` is not) |
 | `-mode` | `personal` \| `appdata` \| `all` (default `appdata`) |
 | `-include-program-files` | Also include Program Files / ProgramData |
 | `-include-regeneratable` | Include `node_modules`, `__pycache__`, etc. |

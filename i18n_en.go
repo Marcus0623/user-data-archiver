@@ -123,6 +123,7 @@ func catalogEN() map[string]string {
 		"ErrDestDrive":         "cannot determine destination drive: %s",
 		"ErrDriveMissing":      "destination drive %s is missing or not ready (USB unplugged, empty optical drive, or BitLocker locked)",
 		"ErrDriveCD":           "destination drive %s is a CD/DVD drive; use a hard disk or USB drive",
+		"ErrDestDriveRoot":     `the destination cannot be a drive root (for example D:\). Choose a folder on that disk, such as D:\offboarding-archive\<name>`,
 		"ErrAccessDrive":       "cannot access destination drive %s: %s",
 		"ErrCreateFolder":      "cannot create destination folder %s: %s",
 		"ErrNotWritable":       "destination is not writable %s: %s",
