@@ -13,8 +13,6 @@ import (
 )
 
 func main() {
-	setupConsole()
-
 	dstFlag := flag.String("dst", "", "archive destination folder (drive letters become C, D, ... subfolders)")
 	nameFlag := flag.String("name", "", "person name; in interactive mode this is appended to the parent folder")
 	srcFlag := flag.String("src", "", "source paths, comma-separated. Example: C: or C:,D: or C:\\Users")
@@ -26,40 +24,45 @@ func main() {
 	yes := flag.Bool("yes", false, "do not ask for confirmation after the scan")
 	cliFlag := flag.Bool("cli", false, "use the command-line interface instead of the window")
 	cutFlag := flag.Bool("cut", false, "move files: delete originals only after the destination is flushed and contents match")
+	langFlag := flag.String("lang", "", "UI language: en, zh-CN, zh-TW, ja, fr, ru, vi (default: Windows display language)")
 	flag.Parse()
+	if strings.TrimSpace(*langFlag) != "" {
+		setLang(ParseLang(*langFlag))
+	}
 
-	if !*cliFlag && !*yes {
-		if consoleProcessCount() <= 1 {
-			hideConsoleWindow()
-		}
-		runGUI(guiPrefill{
-			Name:                strings.TrimSpace(*nameFlag),
-			Dest:                strings.TrimSpace(*dstFlag),
-			Src:                 strings.TrimSpace(*srcFlag),
-			Mode:                strings.TrimSpace(*modeFlag),
-			IncludeProgramFiles: *includePF,
-			IncludeRegen:        *includeRegen,
-			Exclude:             strings.TrimSpace(*excludeFlag),
-			DryRun:              *dryRun,
-			Cut:                 *cutFlag,
-		})
+	if *cliFlag || *yes {
+		attachParentConsole()
+		setupConsole()
+		runCLI(*dstFlag, *nameFlag, *srcFlag, *modeFlag, *includePF, *includeRegen, *excludeFlag, *dryRun, *yes, *cutFlag)
 		return
 	}
 
-	runCLI(*dstFlag, *nameFlag, *srcFlag, *modeFlag, *includePF, *includeRegen, *excludeFlag, *dryRun, *yes, *cutFlag)
+	runGUI(guiPrefill{
+		Name:                strings.TrimSpace(*nameFlag),
+		Dest:                strings.TrimSpace(*dstFlag),
+		Src:                 strings.TrimSpace(*srcFlag),
+		Mode:                strings.TrimSpace(*modeFlag),
+		IncludeProgramFiles: *includePF,
+		IncludeRegen:        *includeRegen,
+		Exclude:             strings.TrimSpace(*excludeFlag),
+		DryRun:              *dryRun,
+		Cut:                 *cutFlag,
+		ActionChosen:        *cutFlag,
+	})
+	os.Exit(0)
 }
 
 func runCLI(dstFlag, nameFlag, srcFlag, modeFlag string, includePF, includeRegen bool, excludeFlag string, dryRun, yes, cut bool) {
 	in := bufio.NewReader(os.Stdin)
 
-	fmt.Println("========================================")
-	fmt.Println("  User Data Archiver")
-	fmt.Println("========================================")
-	fmt.Printf("Computer: %s\n", computerName())
+	fmt.Println(T("CLIHeader"))
+	fmt.Println("  " + T("AppName"))
+	fmt.Println(T("CLIHeader"))
+	fmt.Printf("%s\n", T("CLIComputer", computerName()))
 	if isAdmin() {
-		fmt.Println("Rights: running as administrator (can read other user profiles)")
+		fmt.Println(T("CLIRightsAdmin"))
 	} else {
-		fmt.Println("Rights: not administrator. Right-click and Run as administrator to archive all local user profiles.")
+		fmt.Println(T("CLIRightsUser"))
 	}
 	fmt.Println()
 
@@ -68,7 +71,7 @@ func runCLI(dstFlag, nameFlag, srcFlag, modeFlag string, includePF, includeRegen
 		if yes {
 			employee = defaultName()
 		} else {
-			employee = prompt(in, "Person name (used in the folder name)", defaultName())
+			employee = prompt(in, T("CLIPersonPrompt"), defaultName())
 		}
 	}
 	employee = sanitizeEmployeeName(employee)
@@ -76,31 +79,31 @@ func runCLI(dstFlag, nameFlag, srcFlag, modeFlag string, includePF, includeRegen
 	dest := strings.TrimSpace(dstFlag)
 	if dest == "" {
 		if yes {
-			fatal("-yes requires -dst")
+			fatal(T("CLIYesNeedDst"))
 		}
-		parent := prompt(in, "Destination parent folder (example D:\\offboarding-archive)", defaultDestParent)
+		parent := prompt(in, T("CLIParentPrompt"), defaultDestParent)
 		dest = filepath.Join(strings.TrimSpace(parent), employee)
 	}
 	dest = normalizeAbs(dest)
-	fmt.Printf("Destination drive: %s\n", destDriveInfo(dest))
-	fmt.Printf("Destination folder: %s\n", dest)
-	fmt.Print("Checking that the destination is writable... ")
+	fmt.Printf("%s\n", T("CLIDestDrive", destDriveInfo(dest)))
+	fmt.Printf("%s\n", T("CLIDestFolder", dest))
+	fmt.Print(T("CLIChecking"))
 	if err := probeDestWritable(dest); err != nil {
-		fmt.Println("FAILED")
-		fatal(err.Error() + "\nIf you lack permission: pick a folder where you can create files; on USB drives turn off the write-protect switch and unlock BitLocker; or ask an admin for Modify rights. Running as administrator is for reading other profiles on C:, and does not replace write access to the destination.")
+		fmt.Println(T("CLIFailed"))
+		fatal(T("CLIYesNeedPerm", err.Error()))
 	}
-	fmt.Println("OK")
+	fmt.Println(T("CLIOK"))
 
 	srcText := strings.TrimSpace(srcFlag)
 	if srcText == "" {
 		if yes {
-			fatal("-yes requires -src")
+			fatal(T("CLIYesNeedSrc"))
 		}
-		srcText = prompt(in, "Source path (comma-separated, drive letter like C:)", "C:")
+		srcText = prompt(in, T("CLISourcePrompt"), "C:")
 	}
 	roots := splitRoots(srcText)
 	if len(roots) == 0 {
-		fatal("no source path specified")
+		fatal(T("CLINoSource"))
 	}
 
 	mode := ModeWithAppData
@@ -108,11 +111,11 @@ func runCLI(dstFlag, nameFlag, srcFlag, modeFlag string, includePF, includeRegen
 		mode = ParseMode(modeFlag)
 	} else if !yes {
 		fmt.Println()
-		fmt.Println("Archive mode:")
+		fmt.Println(T("CLIModeTitle"))
 		fmt.Println("  1) " + ModePersonal.Title())
 		fmt.Println("  2) " + ModeWithAppData.Title())
 		fmt.Println("  3) " + ModeAllNonSystem.Title())
-		mode = ParseMode(prompt(in, "Choose", "2"))
+		mode = ParseMode(prompt(in, T("CLIChoose"), "2"))
 	}
 
 	opt := Options{
@@ -137,8 +140,7 @@ func runCLI(dstFlag, nameFlag, srcFlag, modeFlag string, includePF, includeRegen
 			if totalBytes > 0 {
 				pct = fmt.Sprintf(" %.1f%%", float64(doneBytes)*100/float64(totalBytes))
 			}
-			fmt.Printf("\r  %d/%d files%s  %s  %s          ",
-				doneFiles, totalFiles, pct, formatBytes(doneBytes), shortenPath(src, 60))
+			fmt.Printf("\r%s          ", T("LogProgress", doneFiles, totalFiles, pct, formatBytes(doneBytes), shortenPath(src, 60)))
 		},
 		ask: func(question string, defYes bool) bool {
 			return askYes(in, question, defYes)
@@ -169,7 +171,7 @@ func splitRoots(s string) []string {
 		if p == "" {
 			continue
 		}
-		key := strings.ToLower(p)
+		key := strings.ToLower(canonicalRootToken(p))
 		if seen[key] {
 			continue
 		}
@@ -177,6 +179,46 @@ func splitRoots(s string) []string {
 		out = append(out, p)
 	}
 	return out
+}
+
+func canonicalRootToken(p string) string {
+	p = strings.TrimSpace(p)
+	p = strings.ReplaceAll(p, `/`, `\`)
+	p = strings.TrimRight(p, `\`)
+	if len(p) >= 2 && p[1] == ':' {
+		return strings.ToUpper(p[:1]) + p[1:]
+	}
+	return p
+}
+
+func rootsEqual(a, b string) bool {
+	return strings.EqualFold(canonicalRootToken(a), canonicalRootToken(b))
+}
+
+func initialBrowsePath(current string) string {
+	parts := splitRoots(current)
+	if len(parts) == 0 {
+		return strings.TrimSpace(current)
+	}
+	p := strings.TrimSpace(parts[len(parts)-1])
+	if len(p) == 2 && p[1] == ':' {
+		return strings.ToUpper(p[:1]) + `:\`
+	}
+	return p
+}
+
+func mergePickedRoot(current, picked string) string {
+	picked = strings.TrimSpace(picked)
+	if picked == "" {
+		return strings.TrimSpace(current)
+	}
+	existing := splitRoots(current)
+	for _, e := range existing {
+		if rootsEqual(e, picked) {
+			return joinComma(existing)
+		}
+	}
+	return joinComma(append(existing, picked))
 }
 
 func prompt(in *bufio.Reader, label, fallback string) string {
@@ -210,7 +252,7 @@ func askYes(in *bufio.Reader, label string, defYes bool) bool {
 	if text == "" {
 		return defYes
 	}
-	return text == "y" || text == "yes"
+	return isAffirmative(text)
 }
 
 func fatal(msg string) {

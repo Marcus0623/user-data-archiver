@@ -422,37 +422,37 @@ func writeReport(dest, computer, employee string, roots []string, opt Options, s
 	}
 	defer f.Close()
 
-	fmt.Fprintf(f, "User Data Archive Report\r\n")
+	fmt.Fprintf(f, "%s\r\n", T("ReportTitle"))
 	fmt.Fprintf(f, "========================\r\n")
-	fmt.Fprintf(f, "Computer: %s\r\n", computer)
-	fmt.Fprintf(f, "Person: %s\r\n", employee)
-	fmt.Fprintf(f, "Started: %s\r\n", started.Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(f, "Finished: %s\r\n", time.Now().Format("2006-01-02 15:04:05"))
-	fmt.Fprintf(f, "Mode: %s\r\n", opt.Mode.Title())
-	fmt.Fprintf(f, "Transfer: %s\r\n", transferTitle(opt.Cut))
-	fmt.Fprintf(f, "Include installed programs: %v\r\n", opt.IncludeProgramFiles)
-	fmt.Fprintf(f, "Skip regeneratable folders: %v\r\n", opt.SkipRegeneratable)
-	fmt.Fprintf(f, "Source: %s\r\n", joinComma(roots))
-	fmt.Fprintf(f, "Destination: %s\r\n", dest)
-	fmt.Fprintf(f, "\r\nPath mapping example:\r\n")
+	fmt.Fprintf(f, T("ReportComputer")+"\r\n", computer)
+	fmt.Fprintf(f, T("ReportPerson")+"\r\n", employee)
+	fmt.Fprintf(f, T("ReportStarted")+"\r\n", started.Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(f, T("ReportFinished")+"\r\n", time.Now().Format("2006-01-02 15:04:05"))
+	fmt.Fprintf(f, T("ReportMode")+"\r\n", opt.Mode.Title())
+	fmt.Fprintf(f, T("ReportTransfer")+"\r\n", transferTitle(opt.Cut))
+	fmt.Fprintf(f, T("ReportIncludePF")+"\r\n", opt.IncludeProgramFiles)
+	fmt.Fprintf(f, T("ReportSkipRegen")+"\r\n", opt.SkipRegeneratable)
+	fmt.Fprintf(f, T("ReportSource")+"\r\n", joinComma(roots))
+	fmt.Fprintf(f, T("ReportDest")+"\r\n", dest)
+	fmt.Fprintf(f, "\r\n%s\r\n", T("ReportMapping"))
 	fmt.Fprintf(f, "  C:\\Users\\alice\\Downloads\\a.pdf  ->  %s\\C\\Users\\alice\\Downloads\\a.pdf\r\n", dest)
-	fmt.Fprintf(f, "  (Windows cannot use D:\\C:\\... as a folder name, so D:\\...\\C\\... stands for drive C:)\r\n")
-	fmt.Fprintf(f, "\r\nScan total: %d files, %s\r\n", sum.Files, formatBytes(sum.Bytes))
+	fmt.Fprintf(f, "%s\r\n", T("ReportMappingNote"))
+	fmt.Fprintf(f, "\r\n"+T("ReportScanTotal")+"\r\n", sum.Files, formatBytes(sum.Bytes))
 	if res != nil {
-		fmt.Fprintf(f, "Newly copied: %d files, %s\r\n", res.CopiedFiles, formatBytes(res.CopiedBytes))
-		fmt.Fprintf(f, "Already present (resume skip): %d\r\n", res.SkippedSame)
+		fmt.Fprintf(f, T("ReportCopied")+"\r\n", res.CopiedFiles, formatBytes(res.CopiedBytes))
+		fmt.Fprintf(f, T("ReportSkipped")+"\r\n", res.SkippedSame)
 		if opt.Cut {
-			fmt.Fprintf(f, "Originals deleted: %d\r\n", res.CutFiles)
-			fmt.Fprintf(f, "Delete original failed: %d\r\n", res.CutFailed)
+			fmt.Fprintf(f, T("ReportDeleted")+"\r\n", res.CutFiles)
+			fmt.Fprintf(f, T("ReportDeleteFail")+"\r\n", res.CutFailed)
 		}
-		fmt.Fprintf(f, "Failed: %d\r\n", res.Failed)
+		fmt.Fprintf(f, T("ReportFailed")+"\r\n", res.Failed)
 	}
-	fmt.Fprintf(f, "\r\nBy top-level folder:\r\n")
+	fmt.Fprintf(f, "\r\n%s\r\n", T("ReportByFolder"))
 	for _, folder := range sum.sortedFolders() {
-		fmt.Fprintf(f, "  %-24s %8d files  %s\r\n", folder.Key, folder.Files, formatBytes(folder.Bytes))
+		fmt.Fprintf(f, "%s\r\n", T("JobFolderLine", folder.Key, folder.Files, formatBytes(folder.Bytes)))
 	}
 	if failPath != "" {
-		fmt.Fprintf(f, "\r\nFailure list: %s\r\n", failPath)
+		fmt.Fprintf(f, "\r\n"+T("ReportFailList")+"\r\n", failPath)
 	}
 	return nil
 }
@@ -473,7 +473,7 @@ func writeFailCSV(path string, rows [][]string) error {
 		return err
 	}
 	w := csv.NewWriter(f)
-	_ = w.Write([]string{"source", "destination", "error"})
+	_ = w.Write([]string{T("CSVSource"), T("CSVDest"), T("CSVError")})
 	for _, row := range rows {
 		_ = w.Write(row)
 	}

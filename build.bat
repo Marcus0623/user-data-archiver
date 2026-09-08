@@ -1,7 +1,13 @@
 @echo off
 cd /d "%~dp0"
 
-go build -ldflags="-s -w" -o user-data-archiver.exe.new .
+go run github.com/akavel/rsrc@v0.10.2 -manifest app.manifest -arch amd64 -o rsrc_windows_amd64.syso
+if errorlevel 1 (
+  echo Failed to embed app.manifest. The GUI needs Common Controls 6.
+  exit /b 1
+)
+
+go build -ldflags="-s -w -H windowsgui" -o user-data-archiver.exe.new .
 if errorlevel 1 (
   echo Build failed
   del /q user-data-archiver.exe.new 2>nul

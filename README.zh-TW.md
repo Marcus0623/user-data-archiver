@@ -32,7 +32,33 @@ Windows 工具：將**非系統使用者檔案**歸檔到另一顆硬碟或 USB�
 
 ## 圖形介面
 
-按兩下 `user-data-archiver.exe` 或 `start-archive.bat`。選擇複製／剪下後可設定姓名、來源、**Save to**（Browse）、磁碟類型／標籤／剩餘空間、**Read/Write Test**、模式、是否包含 Program Files 與 `node_modules`、僅預覽、開始／停止與日誌。系統管理員用來**讀取** C 槽其他使用者，**不能取代**目的碟寫入權限。`-cli` 或 `-yes` 不開視窗。
+按兩下 `user-data-archiver.exe` 或 `start-archive.bat`。選擇複製／剪下後可設定姓名、來源、**儲存到**（瀏覽）、**排除**、磁碟類型／標籤／剩餘空間、**讀寫測試**、模式、是否包含 Program Files 與 `node_modules`、僅預覽、開始／停止與日誌。來源可填多個路徑（逗號或分號，例如 `C:,D:`）；**瀏覽**會追加，不會清空已有路徑。勾選 **僅預覽** 時請用 **預覽**；**開始**一定是真正傳檔。系統管理員用來**讀取** C 槽其他使用者，**不能取代**目的碟寫入權限。`-cli` 或 `-yes` 不開視窗。雙擊程式時若加 `-cut`，會直接進入剪下視窗。介面語言可用 `-lang`：`en`、`zh-CN`、`zh-TW`、`ja`、`fr`、`ru`、`vi`。
+
+## 範例
+
+同事 Alice 離職。系統與個人資料在 `C:`，專案在 `D:\Projects`。U 盤為 `E:`。目標是**複製**（保留原始檔）。
+
+1. 按兩下 `user-data-archiver.exe`，選 **複製檔案**。
+2. 姓名填 `alice`。來源填 `C:,D:\Projects`（或先瀏覽 `C:\` 再瀏覽 `D:\Projects`，第二次會追加）。
+3. 儲存到 `E:\offboarding-archive\alice`，先做讀寫測試，再 **預覽**，確認無誤後 **開始複製**。
+
+| 原路徑 | 歸檔後 |
+| --- | --- |
+| `C:\Users\alice\Desktop\handoff.docx` | `E:\offboarding-archive\alice\C\Users\alice\Desktop\handoff.docx` |
+| `C:\Downloads\contract.pdf` | `E:\offboarding-archive\alice\C\Downloads\contract.pdf` |
+| `D:\Projects\api\readme.md` | `E:\offboarding-archive\alice\D\Projects\api\readme.md` |
+
+同一資料夾會有 `_archive-report.txt`。命令列：
+
+```bat
+user-data-archiver.exe -lang zh-TW -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+```
+
+請把目的地放在**另一顆碟或 USB**，不要放在正在掃描的來源裡面。
+
+## 聊天紀錄
+
+**appdata**（建議）會收本機已落地的聊天資料，例如 `Documents\WeChat Files`、`AppData\Roaming`（微信／QQ、釘釘、飛書、Telegram、Teams 等）。只在雲端或手機裡的訊息、**personal** 模式下的 AppData、程式開著被鎖的檔、OneDrive 僅雲端檔可能沒有或不完整。這是檔案備份，不是可讀的聊天匯出。
 
 ## 路徑與規則
 
@@ -47,10 +73,11 @@ Windows 工具：將**非系統使用者檔案**歸檔到另一顆硬碟或 USB�
 **personal**／**appdata**（建議）／**all**。剪下：`-cut`。僅預覽：`-dry-run`。互動命令列：`-cli`。
 
 ```bat
-user-data-archiver.exe -name alice -src C: -dst D:\offboarding-archive\alice -mode appdata -yes
-user-data-archiver.exe -src C: -dst D:\offboarding-archive\alice -dry-run -yes
-user-data-archiver.exe -src C: -dst D:\offboarding-archive\alice -cut -yes
+user-data-archiver.exe -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -dry-run -yes
+user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -cut -yes
 user-data-archiver.exe -cli
+user-data-archiver.exe -lang zh-TW
 ```
 
 | 參數 | 含義 |
@@ -64,6 +91,7 @@ user-data-archiver.exe -cli
 | `-exclude` | 依目錄名額外排除 |
 | `-dry-run` | 只掃描，不複製、不剪下 |
 | `-cut` | 移動：目的檔刷盤且內容相符後才刪除原始檔 |
+| `-lang` | 介面語言：`en`、`zh-CN`、`zh-TW`、`ja`、`fr`、`ru`、`vi` |
 | `-cli` | 命令列問答，不開視窗 |
 | `-yes` | 不提問、不開視窗（必須提供 `-dst` 與 `-src`） |
 

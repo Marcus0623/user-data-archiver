@@ -21,7 +21,7 @@ func MapDest(srcAbs, archiveRoot string) (string, error) {
 	archiveRoot = normalizeAbs(archiveRoot)
 	vol, rel := volumeAndRel(srcAbs)
 	if vol == "" {
-		return "", fmt.Errorf("cannot determine drive for path: %s", srcAbs)
+		return "", fmt.Errorf("%s", T("ErrNoDrive", srcAbs))
 	}
 	letter := driveFolderName(vol)
 	if rel == "" {
@@ -41,46 +41,59 @@ func sanitizeEmployeeName(name string) string {
 	)
 	name = replacer.Replace(name)
 	name = strings.Trim(name, " .")
-	if name == "" || strings.EqualFold(name, "CON") || strings.EqualFold(name, "NUL") {
+	if name == "" || isReservedWindowsName(name) {
 		return "archive"
 	}
 	return name
 }
 
+func isReservedWindowsName(name string) bool {
+	n := strings.ToUpper(strings.TrimSpace(name))
+	switch n {
+	case "CON", "PRN", "AUX", "NUL", "CLOCK$":
+		return true
+	}
+	if len(n) == 4 && (strings.HasPrefix(n, "COM") || strings.HasPrefix(n, "LPT")) {
+		d := n[3]
+		return d >= '1' && d <= '9'
+	}
+	return false
+}
+
 func probeDestWritable(dest string) error {
 	vol := filepath.VolumeName(dest)
 	if vol == "" {
-		return fmt.Errorf("cannot determine destination drive: %s", dest)
+		return fmt.Errorf("%s", T("ErrDestDrive", dest))
 	}
 	root := vol + `\`
 	kind := driveKind(root)
 	if kind == "missing" {
-		return fmt.Errorf("destination drive %s is missing or not ready (USB unplugged, empty optical drive, or BitLocker locked)", vol)
+		return fmt.Errorf("%s", T("ErrDriveMissing", vol))
 	}
 	if kind == "cd-rom" {
-		return fmt.Errorf("destination drive %s is a CD/DVD drive; use a hard disk or USB drive", vol)
+		return fmt.Errorf("%s", T("ErrDriveCD", vol))
 	}
 	if _, err := os.Stat(root); err != nil {
-		return fmt.Errorf("cannot access destination drive %s: %s", vol, explainIOError(err))
+		return fmt.Errorf("%s", T("ErrAccessDrive", vol, explainIOError(err)))
 	}
 	if err := os.MkdirAll(longPath(dest), 0o755); err != nil {
-		return fmt.Errorf("cannot create destination folder %s: %s", dest, explainIOError(err))
+		return fmt.Errorf("%s", T("ErrCreateFolder", dest, explainIOError(err)))
 	}
 	probe := filepath.Join(dest, writeProbeFileName)
 	payload := []byte("user-data-archiver-write-probe")
 	if err := os.WriteFile(longPath(probe), payload, 0o644); err != nil {
-		return fmt.Errorf("destination is not writable %s: %s", dest, explainIOError(err))
+		return fmt.Errorf("%s", T("ErrNotWritable", dest, explainIOError(err)))
 	}
 	got, err := os.ReadFile(longPath(probe))
 	removeErr := os.Remove(longPath(probe))
 	if err != nil {
-		return fmt.Errorf("cannot read back the probe file (read permission missing): %s", explainIOError(err))
+		return fmt.Errorf("%s", T("ErrReadProbe", explainIOError(err)))
 	}
 	if string(got) != string(payload) {
-		return fmt.Errorf("destination read/write check failed: content mismatch")
+		return fmt.Errorf("%s", T("ErrMismatch"))
 	}
 	if removeErr != nil {
-		return fmt.Errorf("probe file was written but cannot be deleted %s: %s", probe, explainIOError(removeErr))
+		return fmt.Errorf("%s", T("ErrDeleteProbe", probe, explainIOError(removeErr)))
 	}
 	return nil
 }
@@ -90,23 +103,23 @@ func explainIOError(err error) string {
 		return ""
 	}
 	if errors.Is(err, os.ErrPermission) {
-		return "access denied"
+		return T("ErrAccessDenied")
 	}
 	var errno syscall.Errno
 	if errors.As(err, &errno) {
 		switch errno {
 		case 5:
-			return "access denied"
+			return T("ErrAccessDenied")
 		case 19:
-			return "disk is write-protected (USB switch or policy)"
+			return T("ErrWriteProtect")
 		case 21:
-			return "device not ready (locked or media missing)"
+			return T("ErrNotReady")
 		case 82:
-			return "cannot create file (read-only or insufficient permission)"
+			return T("ErrCannotCreate")
 		case 112:
-			return "not enough disk space"
+			return T("ErrNoSpace")
 		case 3, 2:
-			return "path not found"
+			return T("ErrPathNotFound")
 		}
 	}
 	return err.Error()
@@ -115,7 +128,7 @@ func explainIOError(err error) string {
 func destDriveInfo(dest string) string {
 	dest = strings.TrimSpace(dest)
 	if dest == "" {
-		return "No destination selected."
+		return T("NoDestSelected")
 	}
 	dest = normalizeAbs(dest)
 	vol := filepath.VolumeName(dest)
@@ -123,14 +136,33 @@ func destDriveInfo(dest string) string {
 		return dest
 	}
 	root := vol + `\`
-	kind := driveKind(root)
+	kind := translateDriveKind(driveKind(root))
 	label := volumeLabel(root)
-	freeStr := "free space unknown"
+	freeStr := T("FreeUnknown")
 	if free, _, err := diskFreeBytes(root); err == nil {
-		freeStr = "free " + formatBytes(int64(free))
+		freeStr = T("FreeBytes", formatBytes(int64(free)))
 	}
 	if label != "" {
-		return fmt.Sprintf("%s  %s  label %q  %s", vol, kind, label, freeStr)
+		return T("VolumeLabel", vol, kind, label, freeStr)
 	}
-	return fmt.Sprintf("%s  %s  %s", vol, kind, freeStr)
+	return T("VolumePlain", vol, kind, freeStr)
+}
+
+func translateDriveKind(kind string) string {
+	switch kind {
+	case "missing":
+		return T("DriveMissingKind")
+	case "removable":
+		return T("DriveRemovable")
+	case "local disk":
+		return T("DriveLocal")
+	case "network":
+		return T("DriveNetwork")
+	case "cd-rom":
+		return T("DriveCD")
+	case "ram disk":
+		return T("DriveRAM")
+	default:
+		return T("DriveUnknown")
+	}
 }

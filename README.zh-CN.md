@@ -24,27 +24,71 @@ Windows 工具：把**非系统用户文件**归档到另一块硬盘或 U 盘�
 
 | 选项 | 作用 |
 | --- | --- |
-| **Copy files** | 拷到目标盘，源文件保留 |
-| **Cut files (move)** | 先保存并刷盘，**目标可读且与源逐字节一致后才删除源文件**。仅大小/时间相同不够；内容损坏会先重拷再核对。不会删除仅云端占位的文件。不可撤销。不会删除 `C:\`、`C:\Users` 或用户主目录 |
-| **Cancel** | 退出 |
+| **复制文件** | 拷到目标盘，源文件保留 |
+| **剪切文件（移动）** | 先保存并刷盘，**目标可读且与源逐字节一致后才删除源文件**。仅大小/时间相同不够；内容损坏会先重拷再核对。不会删除仅云端占位的文件。不可撤销。不会删除 `C:\`、`C:\Users` 或用户主目录 |
+| **取消** | 退出 |
 
 剪切在真正改文件前还会再确认一次（默认否）。预览/扫描不会拷贝或删除。
 
 ## 图形界面
 
-双击 `user-data-archiver.exe` 或 `start-archive.bat`。选完复制/剪切后：
+双击 `user-data-archiver.exe` 或 `start-archive.bat`。程序按 Windows 图形界面编译（`-H windowsgui`），资源管理器里双击时不应再闪过命令行窗口。选完复制/剪切后：
 
-- **Person name**：报告和默认目标文件夹名
-- **Source**：如 `C:`，可 Browse
-- **Save to**：最终归档目录，可 Browse（默认 `D:\offboarding-archive\<姓名>`）
+- **姓名**：报告和默认目标文件夹名
+- **源路径**：可同时填多块磁盘或多个文件夹，逗号或分号分隔，例如 `C:`、`C:,D:`、`C:\Users;E:\data`。点 **浏览** 会**追加**到列表，不会覆盖已有路径；重复项会跳过。要去掉某一项，在框里删除即可
+- **保存到**：最终归档目录，可浏览（默认 `D:\offboarding-archive\<姓名>`）
 - 目标盘类型、卷标、剩余空间
-- **Read/Write Test**：创建、写入、读回并删除 `_write-test.tmp`；光驱、未解锁、写保护、无权限会失败
-- 模式 personal / appdata / all
+- **读写测试**：创建、写入、读回并删除 `_write-test.tmp`；光驱、未解锁、写保护、无权限会失败
+- 模式：个人文件 / 个人+应用数据 / 所有非系统文件
 - 可选：包含 Program Files；包含 `node_modules` 等
-- **Preview only** / **Preview** / **Start Copy 或 Start Cut** / **Stop**
+- **排除**：按目录名排除（与 `-exclude` 相同）
+- **仅预览**：勾选后 **开始复制/剪切** 不可用，请点 **预览**
+- **预览**：只扫描，不拷、不剪
+- **开始复制** 或 **开始剪切**：一定是真正传输，不会静默变成预览
+- **停止**
 - 日志：体积预览、进度、错误
 
-管理员权限用于**读取** C 盘其他用户，**不能代替**目标盘写权限。`-cli` 或 `-yes` 不弹窗。
+管理员权限用于**读取** C 盘其他用户，**不能代替**目标盘写权限。`-cli` 或 `-yes` 不弹窗。只加 `-cut`、不加 `-cli` 时，会直接进入剪切窗口。界面语言跟随 Windows 显示语言，也可用 `-lang` 或窗口里的语言列表：`en`、`zh-CN`、`zh-TW`、`ja`、`fr`、`ru`、`vi`。
+
+## 样例
+
+同事小王离职。电脑系统和个人资料在 `C:`，项目代码在 `D:\Projects`。你有一块 U 盘 `E:`（或另一块硬盘）。目标是**复制**（源盘文件保留）个人文件、已落在磁盘上的聊天数据，以及项目目录。
+
+1. 双击 `user-data-archiver.exe`。
+2. 选 **复制文件**（除非确定要清空源盘，否则不要选剪切）。
+3. **姓名：** `xiaowang`
+4. **源路径：** `C:,D:\Projects`  
+   可直接输入，或先 **浏览** 选 `C:\`，再 **浏览** 选 `D:\Projects`（第二次会追加，不会把 `C:` 清掉）。
+5. **保存到：** `E:\offboarding-archive\xiaowang`
+6. 点 **读写测试**。失败则换盘或修权限。
+7. 模式保持推荐项：**个人文件 + 应用数据**。
+8. 先点 **预览**，看日志里按目录的体积和剩余空间。这一步不会拷贝。
+9. 再点 **开始复制**。结束后打开目标文件夹核对。
+
+归档后的路径（盘符会变成文件夹，因为 Windows 不能创建 `E:\C:\...`）：
+
+| 小王电脑上 | 归档里 |
+| --- | --- |
+| `C:\Users\xiaowang\Desktop\交接.docx` | `E:\offboarding-archive\xiaowang\C\Users\xiaowang\Desktop\交接.docx` |
+| `C:\Users\xiaowang\Documents\WeChat Files\...` | `E:\offboarding-archive\xiaowang\C\Users\xiaowang\Documents\WeChat Files\...` |
+| `C:\Downloads\合同.pdf` | `E:\offboarding-archive\xiaowang\C\Downloads\合同.pdf` |
+| `D:\Projects\api\readme.md` | `E:\offboarding-archive\xiaowang\D\Projects\api\readme.md` |
+
+同一目录还会有 `_archive-report.txt`；失败文件见 `_failed-files.csv`。
+
+命令行做同一件事：
+
+```bat
+user-data-archiver.exe -lang zh-CN -name xiaowang -src C:,D:\Projects -dst E:\offboarding-archive\xiaowang -mode appdata -yes
+```
+
+只预览、不拷贝：
+
+```bat
+user-data-archiver.exe -lang zh-CN -name xiaowang -src C:,D:\Projects -dst E:\offboarding-archive\xiaowang -dry-run -yes
+```
+
+**保存到** 不要放在正在扫描的源路径里面（例如源是 `C:` 却存到 `C:\offboarding-archive`）。请放到另一块盘或 U 盘。
 
 ## 路径
 
@@ -62,7 +106,24 @@ Windows 工具：把**非系统用户文件**归档到另一块硬盘或 U 盘�
 2. **appdata**（推荐）：文档 + 聊天/浏览器，排除缓存
 3. **all**：非系统自定义目录；除非勾选，否则仍跳过已安装程序
 
-`-exclude games,Steam` 按目录名额外排除。
+`-exclude games,Steam` 按目录名额外排除。窗口里的 **Exclude** 填同样的名单。
+
+## 聊天记录
+
+默认的 **appdata** 模式会收**已经落在这台电脑磁盘上**的聊天数据，例如：
+
+- `Documents\WeChat Files`、`Documents\Tencent Files`、`Documents\WXWork`
+- `AppData\Roaming`（微信/QQ、钉钉、飞书、Telegram、Slack、Teams、Discord 等）
+- 其它盘上自建的聊天目录（把该盘加进 **Source**）
+
+不会收、或不完整：
+
+- 只在云端或手机里的消息
+- **personal** 模式跳过全部 AppData（文档里的微信文件目录仍会收）
+- 微信/QQ/Outlook/Teams 正在打开导致文件被锁——先退出再跑
+- OneDrive「仅联机」占位文件
+
+这是**文件备份**，不是可读的聊天导出。换机后一般要把同一款客户端指到这些目录才能打开。
 
 ## 扫描、续传、报告
 
@@ -74,7 +135,7 @@ Windows 工具：把**非系统用户文件**归档到另一块硬盘或 U 盘�
 
 | 操作 | 结果 |
 | --- | --- |
-| `build.bat` | 需要已安装 Go。先编出新文件，**删掉多余的 `.exe`**，只留下 `user-data-archiver.exe`。若程序正在运行导致无法替换，请先退出再编。 |
+| `build.bat` | 需要已安装 Go。先把 `app.manifest`（通用控件 6）编进资源，再按图形界面程序编译（`-H windowsgui`），**删掉多余的 `.exe`**，只留下 `user-data-archiver.exe`。若程序正在运行导致无法替换，请先退出再编。 |
 | `start-archive.bat` | 若已安装 Go，且源码比 exe 新（或目录里还有其它 `.exe`），会先重新编译再打开界面。 |
 
 编好后可以把 `user-data-archiver.exe`（以及可选的 `start-archive.bat`）拷到没有安装 Go 的电脑上使用。
@@ -82,16 +143,17 @@ Windows 工具：把**非系统用户文件**归档到另一块硬盘或 U 盘�
 ## 命令行
 
 ```bat
-user-data-archiver.exe -name alice -src C: -dst D:\offboarding-archive\alice -mode appdata -yes
-user-data-archiver.exe -src C: -dst D:\offboarding-archive\alice -dry-run -yes
-user-data-archiver.exe -src C: -dst D:\offboarding-archive\alice -cut -yes
+user-data-archiver.exe -lang zh-CN -name xiaowang -src C:,D:\Projects -dst E:\offboarding-archive\xiaowang -mode appdata -yes
+user-data-archiver.exe -src C: -dst E:\offboarding-archive\xiaowang -dry-run -yes
+user-data-archiver.exe -src C: -dst E:\offboarding-archive\xiaowang -cut -yes
 user-data-archiver.exe -cli
+user-data-archiver.exe -lang zh-CN
 ```
 
 | 参数 | 含义 |
 | --- | --- |
 | `-name` | 姓名（报告和默认文件夹名） |
-| `-src` | 源路径，逗号分隔（`C:`、`C:,D:` 或 `C:\Users`） |
+| `-src` | 源路径，逗号或分号分隔（`C:`、`C:,D:` 或 `C:\Users;E:\data`） |
 | `-dst` | 最终归档目录 |
 | `-mode` | `personal` \| `appdata` \| `all`（默认 `appdata`） |
 | `-include-program-files` | 同时包含 Program Files / ProgramData |
@@ -99,6 +161,7 @@ user-data-archiver.exe -cli
 | `-exclude` | 按目录名额外排除（任意深度） |
 | `-dry-run` | 只扫描，不拷贝、不剪切 |
 | `-cut` | 移动：目标刷盘且内容一致后才删除源文件 |
+| `-lang` | 界面语言：`en`、`zh-CN`、`zh-TW`、`ja`、`fr`、`ru`、`vi`（默认跟随 Windows 显示语言） |
 | `-cli` | 命令行问答，不打开窗口 |
 | `-yes` | 不提问、不弹窗（必须提供 `-dst` 和 `-src`） |
 

@@ -32,7 +32,33 @@ Cut hỏi lại trước khi đổi file (mặc định No). Preview không copy
 
 ## Giao diện
 
-Nhấp đúp `user-data-archiver.exe` hoặc `start-archive.bat`. Sau đó: tên, nguồn, **Save to** (Browse), loại ổ / nhãn / dung lượng trống, **Read/Write Test**, mode, tùy chọn Program Files / `node_modules`, preview, Start / Stop, nhật ký. Quyền administrator để **đọc** hồ sơ khác trên C:, không thay quyền ghi ổ đích. `-cli` hoặc `-yes` không mở cửa sổ.
+Nhấp đúp `user-data-archiver.exe` hoặc `start-archive.bat`. Sau đó: tên, nguồn, **Lưu vào** (Duyệt), **Loại trừ**, loại ổ / nhãn / dung lượng trống, **Kiểm tra đọc/ghi**, mode, tùy chọn Program Files / `node_modules`, preview, Start / Stop, nhật ký. Nguồn có thể nhiều đường dẫn (phẩy hoặc chấm phẩy, ví dụ `C:,D:`). **Duyệt** sẽ thêm, không xóa ô sẵn có. Khi **Chỉ xem trước** được chọn, dùng **Xem trước**. **Bắt đầu** luôn copy hoặc cut thật. Quyền administrator để **đọc** hồ sơ khác trên C:, không thay quyền ghi ổ đích. `-cli` hoặc `-yes` không mở cửa sổ. `-cut` mở thẳng cửa sổ Cut. Ngôn ngữ: `-lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi`).
+
+## Ví dụ
+
+Alice nghỉ việc. Windows và hồ sơ trên `C:`, dự án trên `D:\Projects`. USB `E:`. Mục tiêu: **sao chép** (giữ file gốc).
+
+1. Mở `user-data-archiver.exe`, chọn **Sao chép tệp**.
+2. Tên `alice`. Nguồn `C:,D:\Projects` (hoặc Duyệt `C:\` rồi Duyệt `D:\Projects` — lần sau sẽ thêm vào).
+3. Đích `E:\offboarding-archive\alice`. Kiểm tra đọc/ghi → **Xem trước** → **Bắt đầu sao chép**.
+
+| Trên máy | Trong bản lưu |
+| --- | --- |
+| `C:\Users\alice\Desktop\handoff.docx` | `E:\offboarding-archive\alice\C\Users\alice\Desktop\handoff.docx` |
+| `C:\Downloads\contract.pdf` | `E:\offboarding-archive\alice\C\Downloads\contract.pdf` |
+| `D:\Projects\api\readme.md` | `E:\offboarding-archive\alice\D\Projects\api\readme.md` |
+
+Cùng thư mục có `_archive-report.txt`. Dòng lệnh:
+
+```bat
+user-data-archiver.exe -lang vi -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+```
+
+Đích nên là **ổ khác hoặc USB**, không nằm trong nguồn đang quét.
+
+## Chat
+
+Chế độ **appdata** lưu dữ liệu chat **đã có trên máy**, ví dụ `Documents\WeChat Files` và `AppData\Roaming` (WeChat/QQ, DingTalk, Lark, Telegram, Teams…). Không (hoặc thiếu): tin chỉ trên cloud/điện thoại, AppData ở mode **personal**, file đang bị app khóa, OneDrive chỉ online. Đây là sao lưu file, không phải bản chat đọc được.
 
 ## Đường dẫn, lọc, tiếp tục
 
@@ -47,10 +73,11 @@ Chỉ giữ **một** `user-data-archiver.exe` trong thư mục. `build.bat` xó
 **personal** / **appdata** (khuyến nghị) / **all**. Di chuyển: `-cut`. Chỉ xem: `-dry-run`.
 
 ```bat
-user-data-archiver.exe -name alice -src C: -dst D:\offboarding-archive\alice -mode appdata -yes
-user-data-archiver.exe -src C: -dst D:\offboarding-archive\alice -dry-run -yes
-user-data-archiver.exe -src C: -dst D:\offboarding-archive\alice -cut -yes
+user-data-archiver.exe -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -dry-run -yes
+user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -cut -yes
 user-data-archiver.exe -cli
+user-data-archiver.exe -lang vi
 ```
 
 | Cờ | Ý nghĩa |
@@ -64,6 +91,7 @@ user-data-archiver.exe -cli
 | `-exclude` | Thêm tên thư mục cần bỏ |
 | `-dry-run` | Chỉ quét |
 | `-cut` | Di chuyển: xóa gốc sau khi đích đã được xác minh |
+| `-lang` | Ngôn ngữ: `en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi` |
 | `-cli` | Hỏi đáp dòng lệnh, không mở cửa sổ |
 | `-yes` | Không hỏi, không GUI (cần `-dst` và `-src`) |
 

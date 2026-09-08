@@ -32,7 +32,33 @@
 
 ## Окно
 
-Двойной щелчок по `user-data-archiver.exe` или `start-archive.bat`. Далее: имя, источник, **Save to**, тип/метка/свободное место диска, **Read/Write Test**, режим, Program Files / `node_modules`, просмотр, старт / стоп, журнал. Права администратора нужны, чтобы **читать** чужие профили на C:, а не чтобы писать на диск назначения. `-cli` / `-yes` — без окон.
+Двойной щелчок по `user-data-archiver.exe` или `start-archive.bat`. Далее: имя, источник, **Сохранить в**, **Исключить**, тип/метка/свободное место диска, **Тест чтения/записи**, режим, Program Files / `node_modules`, просмотр, старт / стоп, журнал. Источник: несколько путей через запятую или точку с запятой (`C:,D:`). **Обзор** добавляет путь, не затирая поле. Если включён **только предпросмотр**, используйте **Предпросмотр**. **Старт** всегда копирует или вырезает. Права администратора нужны, чтобы **читать** чужие профили на C:, а не чтобы писать на диск назначения. `-cli` / `-yes` — без окон. `-cut` сразу открывает режим вырезания. Язык: `-lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi`).
+
+## Пример
+
+Alice увольняется. Система и профиль на `C:`, проекты на `D:\Projects`. USB — `E:`. Нужно **копирование** (оригиналы остаются).
+
+1. Откройте `user-data-archiver.exe` и выберите **Копировать файлы**.
+2. Имя `alice`. Источник `C:,D:\Projects` (или Обзор `C:\`, затем Обзор `D:\Projects` — второй путь добавится).
+3. Назначение `E:\offboarding-archive\alice`. Тест чтения/записи → **Предпросмотр** → **Начать копирование**.
+
+| На ПК | В архиве |
+| --- | --- |
+| `C:\Users\alice\Desktop\handoff.docx` | `E:\offboarding-archive\alice\C\Users\alice\Desktop\handoff.docx` |
+| `C:\Downloads\contract.pdf` | `E:\offboarding-archive\alice\C\Downloads\contract.pdf` |
+| `D:\Projects\api\readme.md` | `E:\offboarding-archive\alice\D\Projects\api\readme.md` |
+
+В той же папке — `_archive-report.txt`. Командная строка:
+
+```bat
+user-data-archiver.exe -lang ru -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+```
+
+Пишите на **другой диск или USB**, не внутрь сканируемого источника.
+
+## Чаты
+
+В режиме **appdata** копируются переписки, **уже лежащие на этом ПК**: например `Documents\WeChat Files` и `AppData\Roaming` (WeChat/QQ, DingTalk, Lark, Telegram, Teams…). Нет или неполно: только облако/телефон, AppData в режиме **personal**, файлы, открытые в приложении, заглушки OneDrive. Это резервная копия файлов, не читаемый экспорт чата.
 
 ## Пути, исключения, докачка
 
@@ -47,10 +73,11 @@
 **personal** / **appdata** (рекомендуется) / **all**. Перенос: `-cut`. Просмотр: `-dry-run`.
 
 ```bat
-user-data-archiver.exe -name alice -src C: -dst D:\offboarding-archive\alice -mode appdata -yes
-user-data-archiver.exe -src C: -dst D:\offboarding-archive\alice -dry-run -yes
-user-data-archiver.exe -src C: -dst D:\offboarding-archive\alice -cut -yes
+user-data-archiver.exe -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -dry-run -yes
+user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -cut -yes
 user-data-archiver.exe -cli
+user-data-archiver.exe -lang ru
 ```
 
 | Флаг | Значение |
@@ -64,6 +91,7 @@ user-data-archiver.exe -cli
 | `-exclude` | Дополнительно пропускать эти имена папок |
 | `-dry-run` | Только сканирование |
 | `-cut` | Перенос: удалять оригинал после проверки назначения |
+| `-lang` | Язык: `en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi` |
 | `-cli` | Вопросы в командной строке |
 | `-yes` | Без вопросов и окон (нужны `-dst` и `-src`) |
 

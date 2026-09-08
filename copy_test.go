@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -678,5 +679,79 @@ func TestParseModeAndSplitRoots(t *testing.T) {
 	got := splitRoots("C:, C:\\Users; D:")
 	if len(got) != 3 || got[0] != "C:" || got[1] != `C:\Users` || got[2] != "D:" {
 		t.Fatalf("got %#v", got)
+	}
+	dedup := splitRoots(`C:, C:\`)
+	if len(dedup) != 1 || dedup[0] != "C:" {
+		t.Fatalf("drive letter aliases should collapse: %#v", dedup)
+	}
+}
+
+func TestMergePickedRootAndBrowseStart(t *testing.T) {
+	if got := initialBrowsePath("C:, D:"); got != `D:\` {
+		t.Fatalf("initialBrowsePath last drive: %q", got)
+	}
+	if got := initialBrowsePath(`C:\Users;E:\data`); got != `E:\data` {
+		t.Fatalf("initialBrowsePath last folder: %q", got)
+	}
+	if got := mergePickedRoot("C:", `D:\data`); got != `C:, D:\data` {
+		t.Fatalf("append other drive: %q", got)
+	}
+	if got := mergePickedRoot("C:", `C:\`); got != "C:" {
+		t.Fatalf("duplicate drive root: %q", got)
+	}
+	if got := mergePickedRoot(`C:, D:`, `D:\`); got != `C:, D:` {
+		t.Fatalf("duplicate in list: %q", got)
+	}
+	if got := mergePickedRoot("", `E:\usb`); got != `E:\usb` {
+		t.Fatalf("empty current: %q", got)
+	}
+}
+
+func TestWriteReportChineseFolderLine(t *testing.T) {
+	setLang(LangZHCN)
+	t.Cleanup(func() { setLang(LangEN) })
+
+	dest := t.TempDir()
+	sum := &Summary{
+		Files: 1,
+		Bytes: 2,
+		ByFolder: map[string]*FolderStat{
+			`C:\Downloads`: {Key: `C:\Downloads`, Files: 1, Bytes: 2},
+		},
+	}
+	if err := writeReport(dest, "PC", "alice", []string{`C:\`}, Options{Mode: ModePersonal}, sum, nil, "", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(dest, reportFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(b)
+	if !strings.Contains(text, "用户数据") {
+		t.Fatalf("missing Chinese title:\n%s", text)
+	}
+	if !strings.Contains(text, "个文件") {
+		t.Fatalf("folder line should be Chinese:\n%s", text)
+	}
+	if strings.Contains(text, " files ") {
+		t.Fatalf("leftover English 'files' in report:\n%s", text)
+	}
+}
+
+func TestWriteFailCSVHeadersChinese(t *testing.T) {
+	setLang(LangZHCN)
+	t.Cleanup(func() { setLang(LangEN) })
+
+	p := filepath.Join(t.TempDir(), failListFileName)
+	if err := writeFailCSV(p, [][]string{{"a", "b", "c"}}); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(b)
+	if !strings.Contains(text, "源路径") || !strings.Contains(text, "目标路径") {
+		t.Fatalf("CSV headers:\n%s", text)
 	}
 }

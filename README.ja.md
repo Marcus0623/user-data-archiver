@@ -32,7 +32,33 @@ Windows 用ツール。**OS 以外のユーザーファイル**を別ディス�
 
 ## GUI
 
-`user-data-archiver.exe` または `start-archive.bat` をダブルクリック。氏名、ソース、**Save to**（Browse）、ドライブ種別／ラベル／空き容量、**Read/Write Test**、モード、Program Files / `node_modules` の含める指定、プレビュー、開始／停止、ログ。管理者権限は C: の他ユーザーを**読む**ためで、保存先の書き込み権限の代わりにはなりません。`-cli` / `-yes` でウィンドウなし。
+`user-data-archiver.exe` または `start-archive.bat` をダブルクリック。氏名、ソース、**保存先**（参照）、**除外**、ドライブ種別／ラベル／空き容量、**読み書きテスト**、モード、Program Files / `node_modules`、プレビュー、開始／停止、ログ。ソースは複数指定できます（カンマまたはセミコロン、例 `C:,D:`）。**参照**は既存の入力を消さず追加します。**プレビューのみ**をオンにすると **開始** は無効になり、**プレビュー** を使います。**開始** は必ず実コピー／カットです。管理者権限は C: の他ユーザーを**読む**ためで、保存先の書き込み権限の代わりにはなりません。`-cli` / `-yes` でウィンドウなし。`-cut` 付きで起動するとカット画面になります。言語は `-lang`：`en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi`。
+
+## 例
+
+退職者 Alice。OS と個人データは `C:`、プロジェクトは `D:\Projects`。USB は `E:`。**コピー**（元ファイルは残す）します。
+
+1. `user-data-archiver.exe` を開き **コピー** を選ぶ。
+2. 氏名 `alice`。ソース `C:,D:\Projects`（または `C:\` を参照したあと `D:\Projects` を参照して追加）。
+3. 保存先 `E:\offboarding-archive\alice`。読み書きテスト → **プレビュー** → **開始（コピー）**。
+
+| 元のパス | アーカイブ内 |
+| --- | --- |
+| `C:\Users\alice\Desktop\handoff.docx` | `E:\offboarding-archive\alice\C\Users\alice\Desktop\handoff.docx` |
+| `C:\Downloads\contract.pdf` | `E:\offboarding-archive\alice\C\Downloads\contract.pdf` |
+| `D:\Projects\api\readme.md` | `E:\offboarding-archive\alice\D\Projects\api\readme.md` |
+
+同じフォルダーに `_archive-report.txt`。コマンド例：
+
+```bat
+user-data-archiver.exe -lang ja -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+```
+
+保存先は**別ディスクまたは USB**にしてください（スキャン中のソースの中には置かない）。
+
+## チャット履歴
+
+**appdata**（推奨）では、この PC に既にあるチャットデータを保存します。例: `Documents\WeChat Files`、`AppData\Roaming`（WeChat/QQ、DingTalk、Lark、Telegram、Teams など）。クラウドやスマホのみのメッセージ、**personal** の AppData、起動中でロックされたファイル、OneDrive のオンラインのみファイルは欠けることがあります。ファイルのバックアップであり、読めるチャット書き出しではありません。
 
 ## パス・除外・再開
 
@@ -47,10 +73,11 @@ Windows 用ツール。**OS 以外のユーザーファイル**を別ディス�
 **personal** / **appdata**（推奨）/ **all**。移動は `-cut`、プレビューは `-dry-run`。
 
 ```bat
-user-data-archiver.exe -name alice -src C: -dst D:\offboarding-archive\alice -mode appdata -yes
-user-data-archiver.exe -src C: -dst D:\offboarding-archive\alice -dry-run -yes
-user-data-archiver.exe -src C: -dst D:\offboarding-archive\alice -cut -yes
+user-data-archiver.exe -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -dry-run -yes
+user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -cut -yes
 user-data-archiver.exe -cli
+user-data-archiver.exe -lang ja
 ```
 
 | フラグ | 意味 |
@@ -64,6 +91,7 @@ user-data-archiver.exe -cli
 | `-exclude` | 追加で除外するフォルダー名 |
 | `-dry-run` | スキャンのみ |
 | `-cut` | 移動：保存先を検証してから元を削除 |
+| `-lang` | UI 言語: `en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi` |
 | `-cli` | ウィンドウなしの対話 CLI |
 | `-yes` | 確認なし（`-dst` と `-src` 必須） |
 

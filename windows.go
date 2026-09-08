@@ -15,7 +15,7 @@ func setupConsole() {
 	_, _, _ = setOut.Call(65001)
 	_, _, _ = setIn.Call(65001)
 	setTitle := kernel32.NewProc("SetConsoleTitleW")
-	title, err := syscall.UTF16PtrFromString("User Data Archiver")
+	title, err := syscall.UTF16PtrFromString(T("AppName"))
 	if err == nil {
 		_, _, _ = setTitle.Call(uintptr(unsafe.Pointer(title)))
 	}
@@ -106,24 +106,43 @@ func isAdmin() bool {
 	return r != 0
 }
 
-func hideConsoleWindow() {
-	kernel32 := syscall.NewLazyDLL("kernel32.dll")
-	getConsole := kernel32.NewProc("GetConsoleWindow")
-	hwnd, _, _ := getConsole.Call()
-	if hwnd == 0 {
+func showErrorDialog(msg string) {
+	user32 := syscall.NewLazyDLL("user32.dll")
+	proc := user32.NewProc("MessageBoxW")
+	text, err1 := syscall.UTF16PtrFromString(msg)
+	title, err2 := syscall.UTF16PtrFromString(T("AppName"))
+	if err1 != nil || err2 != nil {
 		return
 	}
-	user32 := syscall.NewLazyDLL("user32.dll")
-	show := user32.NewProc("ShowWindow")
-	_, _, _ = show.Call(hwnd, 0)
+	const (
+		mbIconError     = 0x10
+		mbSetForeground = 0x10000
+	)
+	_, _, _ = proc.Call(0, uintptr(unsafe.Pointer(text)), uintptr(unsafe.Pointer(title)), mbIconError|mbSetForeground)
 }
 
-func consoleProcessCount() int {
+func attachParentConsole() {
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
-	proc := kernel32.NewProc("GetConsoleProcessList")
-	var pids [8]uint32
-	n, _, _ := proc.Call(uintptr(unsafe.Pointer(&pids[0])), uintptr(len(pids)))
-	return int(n)
+	attach := kernel32.NewProc("AttachConsole")
+	alloc := kernel32.NewProc("AllocConsole")
+	const attachParentProcess = uintptr(^uint32(0))
+	r, _, _ := attach.Call(attachParentProcess)
+	if r == 0 {
+		_, _, _ = alloc.Call()
+	}
+	bindStdioToConsole()
+}
+
+func bindStdioToConsole() {
+	in, errIn := os.OpenFile("CONIN$", os.O_RDONLY, 0)
+	if errIn == nil {
+		os.Stdin = in
+	}
+	out, errOut := os.OpenFile("CONOUT$", os.O_WRONLY, 0)
+	if errOut == nil {
+		os.Stdout = out
+		os.Stderr = out
+	}
 }
 
 func computerName() string {

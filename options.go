@@ -26,11 +26,11 @@ func (m Mode) String() string {
 func (m Mode) Title() string {
 	switch m {
 	case ModePersonal:
-		return "Personal files (user documents, no AppData)"
+		return T("ModePersonal")
 	case ModeWithAppData:
-		return "Personal files + app data (recommended; includes chat/browser data, excludes caches)"
+		return T("ModeAppData")
 	case ModeAllNonSystem:
-		return "All non-system files (excludes Windows / system volumes, not installed programs)"
+		return T("ModeAll")
 	default:
 		return ModeWithAppData.Title()
 	}
@@ -66,7 +66,7 @@ const (
 
 func (a TransferAction) Title() string {
 	if a == TransferCut {
-		return "Cut (move: delete originals only after the destination is verified)"
+		return T("TransferCut")
 	}
-	return "Copy (keep originals)"
+	return T("TransferCopy")
 }

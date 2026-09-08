@@ -44,6 +44,12 @@ func TestSanitizeEmployeeName(t *testing.T) {
 	if got := sanitizeEmployeeName(`  `); got != "" {
 		t.Fatalf("got %q", got)
 	}
+	if got := sanitizeEmployeeName("PRN"); got != "archive" {
+		t.Fatalf("got %q", got)
+	}
+	if got := sanitizeEmployeeName("COM1"); got != "archive" {
+		t.Fatalf("got %q", got)
+	}
 }
 
 func TestExpandRootDriveLetter(t *testing.T) {
@@ -89,12 +95,14 @@ func TestProbeDestWritable(t *testing.T) {
 }
 
 func TestDestDriveInfoEmpty(t *testing.T) {
+	setLang(LangEN)
 	if got := destDriveInfo(""); got != "No destination selected." {
 		t.Fatalf("got %q", got)
 	}
 }
 
 func TestExplainIOErrorPermission(t *testing.T) {
+	setLang(LangEN)
 	if got := explainIOError(os.ErrPermission); got != "access denied" {
 		t.Fatalf("got %q", got)
 	}

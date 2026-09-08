@@ -32,7 +32,33 @@ Le mode couper redemande confirmation (Non par défaut). L’aperçu ne copie ni
 
 ## Fenêtre
 
-Double-clic sur `user-data-archiver.exe` ou `start-archive.bat`. Ensuite : nom, source, **Save to** (Browse), type/libellé/espace libre du disque, **Read/Write Test**, mode, options Program Files / `node_modules`, aperçu, démarrer / arrêter, journal. Les droits administrateur servent à **lire** les autres profils sur C:, pas à écrire sur la destination. `-cli` ou `-yes` : pas de fenêtre.
+Double-clic sur `user-data-archiver.exe` ou `start-archive.bat`. Ensuite : nom, source, **Enregistrer vers** (Parcourir), **Exclure**, type/libellé/espace libre du disque, **Test lecture/écriture**, mode, options Program Files / `node_modules`, aperçu, démarrer / arrêter, journal. La source accepte plusieurs chemins (virgule ou point-virgule, ex. `C:,D:`). **Parcourir** ajoute sans effacer le champ. Si **Aperçu uniquement** est coché, utilisez **Aperçu**. **Démarrer** copie ou coupe vraiment. Les droits administrateur servent à **lire** les autres profils sur C:, pas à écrire sur la destination. `-cli` ou `-yes` : pas de fenêtre. `-cut` ouvre directement le mode couper. Langue : `-lang` (`en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi`).
+
+## Exemple
+
+Alice quitte l’entreprise. Windows et son profil sont sur `C:`, les projets sur `D:\Projects`. Clé USB `E:`. Objectif : **copier** (garder les originaux).
+
+1. Ouvrir `user-data-archiver.exe` et choisir **Copier les fichiers**.
+2. Nom `alice`. Source `C:,D:\Projects` (ou Parcourir `C:\` puis Parcourir `D:\Projects` — le second ajout s’ajoute).
+3. Destination `E:\offboarding-archive\alice`. Test lecture/écriture → **Aperçu** → **Démarrer la copie**.
+
+| Sur le PC | Dans l’archive |
+| --- | --- |
+| `C:\Users\alice\Desktop\handoff.docx` | `E:\offboarding-archive\alice\C\Users\alice\Desktop\handoff.docx` |
+| `C:\Downloads\contract.pdf` | `E:\offboarding-archive\alice\C\Downloads\contract.pdf` |
+| `D:\Projects\api\readme.md` | `E:\offboarding-archive\alice\D\Projects\api\readme.md` |
+
+Le dossier contient aussi `_archive-report.txt`. En ligne de commande :
+
+```bat
+user-data-archiver.exe -lang fr -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+```
+
+Placez la destination sur **un autre disque ou USB**, pas à l’intérieur d’une source.
+
+## Messagerie
+
+Le mode **appdata** (recommandé) archive les discussions **déjà présentes sur ce PC**, p. ex. `Documents\WeChat Files` et `AppData\Roaming` (WeChat/QQ, DingTalk, Lark, Telegram, Teams…). Pas (ou incomplet) : messages uniquement dans le cloud ou sur téléphone, AppData en mode **personal**, fichiers verrouillés si l’appli est ouverte, OneDrive « en ligne seulement ». C’est une copie de fichiers, pas un export de conversation lisible.
 
 ## Chemins, filtres, reprise
 
@@ -47,10 +73,11 @@ Un seul `user-data-archiver.exe` dans ce dossier. `build.bat` supprime les autre
 **personal** / **appdata** (recommandé) / **all**. Déplacer : `-cut`. Aperçu : `-dry-run`.
 
 ```bat
-user-data-archiver.exe -name alice -src C: -dst D:\offboarding-archive\alice -mode appdata -yes
-user-data-archiver.exe -src C: -dst D:\offboarding-archive\alice -dry-run -yes
-user-data-archiver.exe -src C: -dst D:\offboarding-archive\alice -cut -yes
+user-data-archiver.exe -name alice -src C:,D:\Projects -dst E:\offboarding-archive\alice -mode appdata -yes
+user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -dry-run -yes
+user-data-archiver.exe -src C: -dst E:\offboarding-archive\alice -cut -yes
 user-data-archiver.exe -cli
+user-data-archiver.exe -lang fr
 ```
 
 | Option | Signification |
@@ -64,6 +91,7 @@ user-data-archiver.exe -cli
 | `-exclude` | Noms de dossiers à ignorer |
 | `-dry-run` | Scan uniquement |
 | `-cut` | Déplacer : supprimer l’original après vérification |
+| `-lang` | Langue : `en`, `zh-CN`, `zh-TW`, `ja`, `fr`, `ru`, `vi` |
 | `-cli` | Invites en ligne de commande |
 | `-yes` | Sans questions ni fenêtre (`-dst` et `-src` requis) |
 
